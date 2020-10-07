@@ -16,6 +16,14 @@
 #define INVALID_POS -1
 #define FATAL_ERR -2 /* Return code for a fatal error used internally */
 
+bool isOp(char *s);
+bool isCmd(char *s);
+bool matchBrace(char *s, int *pos, unsigned int maxPos);
+char* evalArg(char *s);
+int evalCmd(char *cmd, char *args, char *inBuff, char *outBuff);
+int evalS(char *s, int pos1, int pos2, char *inBuff, char *outBuff);
+int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff);
+
 /* Check if the string is a valid operator */
 bool isOp(char *s)
 {
@@ -61,7 +69,7 @@ bool isCmd(char *s)
 }
 
 /* Move i to matching closing brace */
-bool matchBrace(char *s, unsigned int *pos, unsigned int maxPos)
+bool matchBrace(char *s, int *pos, unsigned int maxPos)
 {
     if (s[*pos] != '{')
     {
@@ -69,7 +77,7 @@ bool matchBrace(char *s, unsigned int *pos, unsigned int maxPos)
         return false;
     }
     unsigned int count = 1; /* Number of opening braces encountered */
-    unsigned int i = *pos;
+    int i = *pos;
     while (count > 0 && i < maxPos)
     {
         ++i;
@@ -92,37 +100,78 @@ char* evalArg(char *s)
     /* TODO: Implement this */
 }
 
-/* Evaluate the statement */
-int evalS(char *s, unsigned int pos1, unsigned int pos2, char *inBuff, FILE *outBuff)
+/* Evaluate the command */
+int evalCmd(char *cmd, char *args, char *inBuff, char *outBuff)
 {
     /* TODO: Implement this */
+    bool background = false; /* Run this command as a background process */
+    
+}
+
+/* Evaluate the statement */
+int evalS(char *s, int pos1, int pos2, char *inBuff, char *outBuff)
+{
+    /* Substrings to store command and args */
+    char cmd[BUFF_MAX] = "";
+    char args[BUFF_MAX] = "";
+    int tempPos = pos1;
+    while (pos2 > pos1 && isspace(s[pos2]))
+        --pos2;
+    while (pos1 <= pos2 && isspace(s[pos1]))
+        ++pos1;
+    if (pos1 > pos2)
+        return 0;
+    /* Assume that all whitespace has been trimmed and braces have been properly matched */
+    if (s[pos1] == '{') /* Braced expression */
+    {
+        /* Remove the braces */
+        ++pos1;
+        --pos2;
+        return evalExpr(s, pos1, pos2, inBuff, outBuff); /* Evaluate the enclosed expression */
+    }
+    /* The statement is a command followed by arguments */
+    /* Extract the command and argument list */
+    while (tempPos <= pos2 && !isspace(s[tempPos]))
+        ++tempPos;
+    strncpy(cmd, s + pos1, tempPos - pos1);
+    while (tempPos <= pos2 && isspace(s[tempPos]))
+        ++tempPos;
+    if (tempPos <= pos2)
+        strncpy(args, s + tempPos, pos2 - tempPos + 1);
+    return evalCmd(cmd, args, inBuff, outBuff);
 }
 
 /* Evaluate the expression. Assume that there are no trailing whitespaces */
-int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FILE *outBuff)
+int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
 {
-    if ((pos2 - pos1 + 1) == 0) /* Empty expression passed */
-        return 0;
-    unsigned int i = pos1;
-    unsigned int sEnd = pos1; /* End position of statement */
+    int i = INVALID_POS;
+    int sEnd = INVALID_POS; /* End position of statement */
     int opPos1 = INVALID_POS; /* Start and end positions for operator */
     int opPos2 = INVALID_POS;
     int expStart = INVALID_POS;
     int r = FATAL_ERR; /* Return value */
-    char op[BUFF_MAX] = {}; /* The operator */
-    while (i <= pos2 && isspace(expr[i])) /* Ignore leading whitespace */
-        ++i;
-    if (i > pos2) /* Expression consisted of all white space */
+    char op[BUFF_MAX] = ""; /* The operator */
+    char token[BUFF_MAX]; /* The space delineated token we are considering */
+    int tokPos1, tokPos2;
+    if ((pos2 - pos1 + 1) == 0) /* Empty expression passed */
+        return 0;
+    while (pos2 > pos1 && isspace(expr[pos2])) /* Remove trailing whitespace */
+        --pos2;
+    while (pos1 <= pos2 && isspace(expr[pos1])) /* Ignore leading whitespace */
+        ++pos1;
+    if (pos1 > pos2) /* Expression consisted of all white space */
         return 0; /* Do nothing */
+    i = pos1;
     if (expr[i] == '{') /* Statement is a braced expression. Move i to the matching brace */
     {
         if (!matchBrace(expr, &i, pos2)) /* Failed to match brace */
+        {
+            fprintf(stderr, "parse error: failed to match brace\n");
             return FATAL_ERR;
+        }
         ++i; /* Move past the matched brace */
     }
     /* Move to the operator */
-    char token[BUFF_MAX]; /* The space delineated token we are considering */
-    unsigned int tokPos1, tokPos2;
     while (i <= pos2)
     {
         while (i <= pos2 && isspace(expr[i])) /* Move until not whitespace */
@@ -156,9 +205,12 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
     while (i <= pos2 && isspace(expr[i])) /* Move past white space seperation */
         ++i;
     expStart = i; /* Mark the start of the right hand expression */
+    /* Resolve the operator */
     if (strcmp(op, "&&") == 0) /* Logical AND */
     {
         r = evalS(expr, pos1, sEnd, inBuff, outBuff);
+        if (r == FATAL_ERR) /* Propogate fatal errors */
+            return FATAL_ERR;
         if (r == 0) /* Left hand statement succeeded */
             return evalExpr(expr, expStart, pos2, inBuff, outBuff); /* Evaluate right hand expression */
         else /* Return false if first statement fails */
@@ -167,14 +219,26 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
     else if (strcmp(op, "||") == 0) /* Logical OR */
     {
         r = evalS(expr, pos1, sEnd, inBuff, outBuff);
+        if (r == FATAL_ERR)
+            return FATAL_ERR;
         if (r == 1) /* Left hand statement failed */
             return evalExpr(expr, expStart, pos2, inBuff, outBuff);
         else /* Return true if first statement succeeds */
             return 0;
     }
+    else if (strcmp(op, "|") == 0) /* Pipe */
+    {
+        char pipeBuff[BUFF_MAX] = ""; /* Intermediate buffer to do the piping */
+        r = evalS(expr, pos1, sEnd, inBuff, pipeBuff);
+        if (r == FATAL_ERR)
+            return FATAL_ERR;
+        return evalExpr(expr, expStart, pos2, pipeBuff, outBuff);
+    }
     else if (strcmp(op, ";") == 0) /* Evaluate sequentually. Idk if this should be treated as an operator tbh */
     {
-        evalS(expr, pos1, sEnd, inBuff, outBuff);
+        r = evalS(expr, pos1, sEnd, inBuff, outBuff);
+        if (r == FATAL_ERR)
+            return FATAL_ERR;
         return evalExpr(expr, expStart, pos2, inBuff, outBuff);
     }
     else if (strcmp(op, "<") == 0) /* Input redirection */
@@ -217,11 +281,18 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
     }
     else if (strcmp(op, ">") == 0 || strcmp(op, ">>") == 0) /* Output redirection */
     {
-        char fileName[BUFF_MAX] = {};
+        char fileName[BUFF_MAX] = "";
         strncpy(fileName, expr + expStart, pos2 - expStart + 1);
-        FILE *newOut = (strlen(op) == 1) ? fopen(fileName, "w") : fopen(fileName, "a");
+        char newOut[BUFF_MAX] = "";
         r = evalS(expr, pos1, sEnd, inBuff, newOut);
-        fclose(newOut);
+        FILE *outFile = (strlen(op) == 1) ? fopen(fileName, "w") : fopen(fileName, "a");
+        if (outFile == NULL)
+        {
+            fprintf(stderr, "Could not open file \'%s\'", fileName);
+            return FATAL_ERR;
+        }
+        fwrite(newOut, sizeof(char), sizeof(newOut), outFile);
+        fclose(outFile);
         return r;
     }
     /* Execution should never reach here */
