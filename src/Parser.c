@@ -15,6 +15,8 @@
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
 #define INVALID_POS -1
 #define FATAL_ERR -2 /* Return code for a fatal error used internally */
+#define FAIL 1
+#define SUCCESS 0
 
 bool isOp(char *s);
 bool isCmd(char *s);
@@ -91,6 +93,7 @@ bool matchBrace(char *s, int *pos, unsigned int maxPos)
         fprintf(stderr, "matchBrace: matching brace not found\n");
         return false;
     }
+    *pos = i;
     return true;
 }
 
@@ -98,59 +101,21 @@ bool matchBrace(char *s, int *pos, unsigned int maxPos)
 char* evalArg(char *s)
 {
     /* TODO: Implement this */
+    return NULL; /* Placeholder */
 }
 
 /* Evaluate the command or run the executable */
 int evalCmd(char *cmd, char *args, char *inBuff, char *outBuff)
 {
     /* TODO: Implement this */
-    bool background = false; /* Run this command as a background process */
-    if (args[strlen(args) - 1] == '&')
-    {
-        background = true;
-        args[strlen(args - 1)] = '\0';
-    }
-    if (isCmd(cmd)) /* Received a command */
-    {
-        /* TODO: Run the appropriate command */
-    }
-    /* TODO: Run the executable */
-    
+    return 0; /* Placeholder */
 }
 
 /* Evaluate the statement */
 int evalS(char *s, int pos1, int pos2, char *inBuff, char *outBuff)
 {
-    /* TODO: Needs to be rewritten to support proper piping */
-    /* Substrings to store command and args */
-    char cmd[BUFF_MAX] = "";
-    char args[BUFF_MAX] = "";
-    int tempPos = pos1;
-    /* Trim whitespace */
-    while (pos2 > pos1 && isspace(s[pos2]))
-        --pos2;
-    while (pos1 <= pos2 && isspace(s[pos1]))
-        ++pos1;
-    if (pos1 > pos2)
-        return 0;
-    /* Assume braces have been properly matched */
-    if (s[pos1] == '{') /* Braced expression */
-    {
-        /* Remove the braces */
-        ++pos1;
-        --pos2;
-        return evalExpr(s, pos1, pos2, inBuff, outBuff); /* Evaluate the enclosed expression */
-    }
-    /* The statement is a command followed by arguments */
-    /* Extract the command and argument list */
-    while (tempPos <= pos2 && !isspace(s[tempPos]))
-        ++tempPos;
-    strncpy(cmd, s + pos1, tempPos - pos1);
-    while (tempPos <= pos2 && isspace(s[tempPos]))
-        ++tempPos;
-    if (tempPos <= pos2)
-        strncpy(args, s + tempPos, pos2 - tempPos + 1);
-    return evalCmd(cmd, args, inBuff, outBuff);
+    /* TODO: Implement this */
+    return 0; /* Placeholder */
 }
 
 /* Parse the given expression into a left statement, operator, and right expression */
@@ -164,23 +129,28 @@ int parseExpr(char *expr, char *s, char *op, char *e)
     int opPos1 = INVALID_POS; /* Start and end positions for operator */
     int opPos2 = INVALID_POS;
     int expStart = INVALID_POS;
-    char token[BUFF_MAX]; /* The space delineated token we are considering */
+    char token[BUFF_MAX] = ""; /* The space delineated token we are considering */
     int tokPos1, tokPos2;
+    /* Initialize return values */
+    s[0] = '\0';
+    op[0] = '\0';
+    e[0] = '\0';
     if (strlen(expr) == 0) /* Empty expression passed */
-        return false;
+        return SUCCESS;
     while (pos2 > pos1 && isspace(expr[pos2])) /* Remove trailing whitespace */
         --pos2;
     while (pos1 <= pos2 && isspace(expr[pos1])) /* Ignore leading whitespace */
         ++pos1;
     if (pos1 > pos2) /* Expression consisted of all white space */
-        return 0; /* Do nothing */
+        return SUCCESS; /* Do nothing */
     i = pos1;
     if (expr[i] == '{') /* Statement is a braced expression. Move i to the matching brace */
     {
-        if (!matchBrace(expr, &i, pos2)) /* Failed to match brace */
+        bool ok = matchBrace(expr, &i, pos2);
+        if (!ok) /* Failed to match brace */
         {
             fprintf(stderr, "parse error: failed to match brace\n");
-            return FATAL_ERR;
+            return FAIL;
         }
         ++i; /* Move past the matched brace */
     }
@@ -194,6 +164,8 @@ int parseExpr(char *expr, char *s, char *op, char *e)
             ++i;
         tokPos2 = i - 1;
         strncpy(token, expr + tokPos1, tokPos2 - tokPos1 + 1);
+        token[tokPos2 - tokPos1 + 1] = '\0';
+        printf("Checking token: %s\n", token);
         if (isOp(token)) /* Found the operator */
         {
             opPos1 = tokPos1;
@@ -201,31 +173,40 @@ int parseExpr(char *expr, char *s, char *op, char *e)
             break;
         }
     }
-    if (opPos1 == INVALID_POS) /* No operator. Just evaluate the statement */
-        return evalS(expr, pos1, pos2, inBuff, outBuff);
+    if (opPos1 == INVALID_POS) /* No operator, just a statement */
+    {
+        strncpy(s, expr + pos1, pos2 - pos1 + 1);
+        s[pos2 - pos1 + 1] = '\0';
+        return SUCCESS;
+    }
     if (opPos1 == 0)
     {
         fprintf(stderr, "parse error: left statement is empty\n");
-        return FATAL_ERR;
+        return FAIL;
     }
     if (opPos2 == pos2) /* No second argument to operator */
     {
         fprintf(stderr, "parse error: expected argument after operator \'%s\'\n", op);
-        return FATAL_ERR;
+        return FAIL;
     }
     strncpy(op, expr + opPos1, opPos2 - opPos1 + 1); /* Store the operator */
+    op[opPos2 - opPos1 + 1] = '\0';
     sEnd = opPos1 - 1;
     strncpy(s, expr + pos1, sEnd - pos1 + 1); /* Store the statement */
+    s[sEnd - pos1 + 1] = '\0';
     while (i <= pos2 && isspace(expr[i])) /* Move past white space seperation */
         ++i;
     expStart = i; /* Mark the start of the right hand expression */
     strncpy(e, expr + expStart, pos2 - expStart + 1);
+    e[pos2 - expStart + 1] = '\0';
+    return SUCCESS;
 }
 
 /* TODO: Rewrite this to pipe properly */
 /* Evaluate the expression. Assume that there are no trailing whitespaces */
 int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
 {
+    return 0; /* Placeholder */
     /* TODO: Rewrite this to support proper piping */
     /* if (strcmp(op, "&&") == 0) /\* Logical AND *\/ */
     /* { */
@@ -322,4 +303,16 @@ int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
     /* /\* Execution should never reach here *\/ */
     /* fprintf(stderr, "evalExpr: tried to evaluate invalid operator\n"); */
     /* return FATAL_ERR; */
+}
+
+/* Test driver */
+int main()
+{
+    char expr[BUFF_MAX] = "{ test this && { and this && and some more of this } } || remaining expression > here"; /* Test expression */
+    char s[BUFF_MAX];
+    char op[BUFF_MAX];
+    char e[BUFF_MAX];
+    int r = parseExpr(expr, s, op, e);
+    printf("Expression parsed: %s\n", expr);
+    printf("Return code: %d\ns: %s\nop: %s\ne: %s\n", r, s, op, e);
 }
