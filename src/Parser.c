@@ -149,7 +149,7 @@ int parseExpr(char *expr, char *s, char *op, char *e)
         bool ok = matchBrace(expr, &i, pos2);
         if (!ok) /* Failed to match brace */
         {
-            fprintf(stderr, "parse error: failed to match brace\n");
+            fprintf(stderr, "parser: failed to match brace\n");
             return FAIL;
         }
         ++i; /* Move past the matched brace */
@@ -165,7 +165,6 @@ int parseExpr(char *expr, char *s, char *op, char *e)
         tokPos2 = i - 1;
         strncpy(token, expr + tokPos1, tokPos2 - tokPos1 + 1);
         token[tokPos2 - tokPos1 + 1] = '\0';
-        printf("Checking token: %s\n", token);
         if (isOp(token)) /* Found the operator */
         {
             opPos1 = tokPos1;
@@ -178,16 +177,6 @@ int parseExpr(char *expr, char *s, char *op, char *e)
         strncpy(s, expr + pos1, pos2 - pos1 + 1);
         s[pos2 - pos1 + 1] = '\0';
         return SUCCESS;
-    }
-    if (opPos1 == 0)
-    {
-        fprintf(stderr, "parse error: left statement is empty\n");
-        return FAIL;
-    }
-    if (opPos2 == pos2) /* No second argument to operator */
-    {
-        fprintf(stderr, "parse error: expected argument after operator \'%s\'\n", op);
-        return FAIL;
     }
     strncpy(op, expr + opPos1, opPos2 - opPos1 + 1); /* Store the operator */
     op[opPos2 - opPos1 + 1] = '\0';
@@ -308,7 +297,7 @@ int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
 /* Test driver */
 int main()
 {
-    char expr[BUFF_MAX] = "{ test this && { and this && and some more of this } } || remaining expression > here"; /* Test expression */
+    char expr[BUFF_MAX] = "no operator only expression"; /* Test expression */
     char s[BUFF_MAX];
     char op[BUFF_MAX];
     char e[BUFF_MAX];
