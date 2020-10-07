@@ -13,7 +13,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
-#define INVALID_POS = -1
+#define INVALID_POS -1
 #define FATAL_ERR -2 /* Return code for a fatal error used internally */
 
 /* Check if the string is a valid operator */
@@ -109,6 +109,7 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
     int opPos2 = INVALID_POS;
     int expStart = INVALID_POS;
     int r = FATAL_ERR; /* Return value */
+    char op[BUFF_MAX] = {}; /* The operator */
     while (i <= pos2 && isspace(expr[i])) /* Ignore leading whitespace */
         ++i;
     if (i > pos2) /* Expression consisted of all white space */
@@ -150,6 +151,7 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
         fprintf(stderr, "parse error: expected argument after operator \'%s\'\n", op);
         return FATAL_ERR;
     }
+    strncpy(op, expr + opPos1, opPos2 - opPos1 + 1);
     sEnd = opPos1 - 1;
     while (i <= pos2 && isspace(expr[i])) /* Move past white space seperation */
         ++i;
