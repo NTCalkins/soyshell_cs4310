@@ -13,7 +13,8 @@
 #include <ctype.h>
 #include <stdlib.h>
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
-#define FATAL_ERR -1 /* Return code for a fatal error */
+#define INVALID_POS = -1
+#define FATAL_ERR -2 /* Return code for a fatal error used internally */
 
 /* Check if the string is a valid operator */
 bool isOp(char *s)
@@ -104,30 +105,44 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
         return 0;
     unsigned int i = pos1;
     unsigned int sEnd = pos1; /* End position of statement */
+    int opPos1 = INVALID_POS; /* Start and end positions for operator */
+    int opPos2 = INVALID_POS;
+    int expStart = INVALID_POS;
+    int r = FATAL_ERR; /* Return value */
     while (i <= pos2 && isspace(expr[i])) /* Ignore leading whitespace */
         ++i;
     if (i > pos2) /* Expression consisted of all white space */
-        return 0;
+        return 0; /* Do nothing */
     if (expr[i] == '{') /* Statement is a braced expression. Move i to the matching brace */
+    {
         if (!matchBrace(expr, &i, pos2)) /* Failed to match brace */
             return FATAL_ERR;
-    sEnd = i;
-    ++i; /* Move past the matched brace */
-    while (i <= pos2 && isspace(expr[i])) /* Move past white space seperation */
-        ++i;
-    if (i > pos2) /* No operator. Just evaluate the statement */
-        return evalS(expr, pos1, sEnd, inBuff, outBuff);
-    unsigned int opPos1 = i; /* Begining position of substring containing operator */
-    unsigned int opPos2 = i; /* Ending position */
-    while (opPos2 <= pos2 && !isspace(expr[opPos2])) /* Consider all characters until we hit whitespace as the operator */
-        ++opPos2;
-    --opPos2;
-    /* Copy operator into substring */
-    char op[BUFF_MAX] = {};
-    strncpy(op, expr + opPos1, opPos2 - opPos1 + 1);
-    if (!isOp(op)) /* Invalid operator */
+        ++i; /* Move past the matched brace */
+    }
+    /* Move to the operator */
+    char token[BUFF_MAX]; /* The space delineated token we are considering */
+    unsigned int tokPos1, tokPos2;
+    while (i <= pos2)
     {
-        fprintf(stderr, "parse error: \'%s\' is not an operator\n", op);
+        while (i <= pos2 && isspace(expr[i])) /* Move until not whitespace */
+            ++i;
+        tokPos1 = i;
+        while (i <= pos2 && !isspace(expr[i])) /* Move until whitespace */
+            ++i;
+        tokPos2 = i - 1;
+        strncpy(token, expr + tokPos1, tokPos2 - tokPos1 + 1);
+        if (isOp(token)) /* Found the operator */
+        {
+            opPos1 = tokPos1;
+            opPos2 = tokPos2;
+            break;
+        }
+    }
+    if (opPos1 == INVALID_POS) /* No operator. Just evaluate the statement */
+        return evalS(expr, pos1, pos2, inBuff, outBuff);
+    if (opPos1 == 0)
+    {
+        fprintf(stderr, "parse error: left statement is empty\n");
         return FATAL_ERR;
     }
     if (opPos2 == pos2) /* No second argument to operator */
@@ -135,11 +150,10 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
         fprintf(stderr, "parse error: expected argument after operator \'%s\'\n", op);
         return FATAL_ERR;
     }
-    /* Find the start of the right hand expression */
-    unsigned int expStart = opPos2 + 1;
-    while (isspace(expr[expStart]))
-        ++expStart;
-    int r = -1; /* Return value */
+    sEnd = opPos1 - 1;
+    while (i <= pos2 && isspace(expr[i])) /* Move past white space seperation */
+        ++i;
+    expStart = i; /* Mark the start of the right hand expression */
     if (strcmp(op, "&&") == 0) /* Logical AND */
     {
         r = evalS(expr, pos1, sEnd, inBuff, outBuff);
@@ -169,7 +183,7 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
         FILE *inFile = fopen(fileName, "r");
         if (inFile == NULL) /* Could not open file */
         {
-            fprintf(stderr, "Could not open file \'%s\'", fileName);
+            fprintf(stderr, "Could not open file \'%s\'\n", fileName);
             return FATAL_ERR;
         }
         /* Get the file size */
@@ -180,7 +194,7 @@ int evalExpr(char *expr, unsigned int pos1, unsigned int pos2, char *inBuff, FIL
         long readSize = fread(newIn, 1, fSize, inFile); /* Read in contents of file into buffer */
         if (readSize != fSize)
         {
-            fprintf(stderr, "Could not read contents of file \'%s\'", fileName);
+            fprintf(stderr, "Could not read contents of file \'%s\'\n", fileName);
             return FATAL_ERR;
         }
         fclose(inFile);
