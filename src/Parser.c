@@ -97,6 +97,27 @@ bool matchBrace(char *s, int *pos, unsigned int maxPos)
     return true;
 }
 
+/* Move i to matching closing closing */
+bool matchQuote(char *s, int *pos, unsigned int maxPos)
+{
+    if (s[*pos] != '\"')
+    {
+        fprintf(stderr, "matchBrace: position passed is not a quote\n");
+        return false;
+    }
+    int i = *pos;
+    while (i < maxPos)
+    {
+        ++i;
+        if (s[i] == '\"')
+            break;
+    }
+    if (s[i] != '\"')
+        return false;
+    *pos = i;
+    return true;
+}
+
 /* Evaluate the argument */
 char* evalArg(char *s)
 {
@@ -297,7 +318,7 @@ int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
 /* Test driver */
 int main()
 {
-    char expr[BUFF_MAX] = "no operator only expression"; /* Test expression */
+    char expr[BUFF_MAX] = "{ { good braces } } | piped"; /* Test expression */
     char s[BUFF_MAX];
     char op[BUFF_MAX];
     char e[BUFF_MAX];
