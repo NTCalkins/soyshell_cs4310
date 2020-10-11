@@ -14,17 +14,9 @@
 #include <stdlib.h>
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
 #define INVALID_POS -1
-#define FATAL_ERR -2 /* Return code for a fatal error used internally */
-#define FAIL 1
-#define SUCCESS 0
 
 bool isOp(char *s);
-bool isCmd(char *s);
 bool matchBrace(char *s, int *pos, unsigned int maxPos);
-char* evalArg(char *s);
-int evalCmd(char *cmd, char *args, char *inBuff, char *outBuff);
-int evalS(char *s, int pos1, int pos2, char *inBuff, char *outBuff);
-int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff);
 
 /* Check if the string is a valid operator */
 bool isOp(char *s)
@@ -55,19 +47,6 @@ bool isOp(char *s)
         }
         return false;
     }
-}
-
-/* Check if the string is a valid command */
-bool isCmd(char *s)
-{
-    const unsigned int NUM_CMD = 8;
-    char *cmds[NUM_CMD] = { "cd", "pwd", "mkdir", "rmdir", "ls", "cp", "exit", "echo" };
-    for (unsigned int i = 0; i < NUM_CMD; ++i)
-    {
-        if (strcmp(s, cmds[i]) == 0)
-            return true;
-    }
-    return false;
 }
 
 /* Move i to matching closing brace */
@@ -140,9 +119,8 @@ int evalS(char *s, int pos1, int pos2, char *inBuff, char *outBuff)
 }
 
 /* Parse the given expression into a left statement, operator, and right expression */
-int parseExpr(char *expr, char *s, char *op, char *e)
+bool parseExpr(char *expr, char *s, char *op, char *e)
 {
-    /* TODO: Needs testing */
     int pos1 = 0;
     int pos2 = strlen(expr) - 1;
     int i = INVALID_POS;
@@ -151,19 +129,20 @@ int parseExpr(char *expr, char *s, char *op, char *e)
     int opPos2 = INVALID_POS;
     int expStart = INVALID_POS;
     char token[BUFF_MAX] = ""; /* The space delineated token we are considering */
-    int tokPos1, tokPos2;
+    int tokPos1 = INVALID_POS;
+    int tokPos2 = INVALID_POS;
     /* Initialize return values */
     s[0] = '\0';
     op[0] = '\0';
     e[0] = '\0';
     if (strlen(expr) == 0) /* Empty expression passed */
-        return SUCCESS;
+        return true;
     while (pos2 > pos1 && isspace(expr[pos2])) /* Remove trailing whitespace */
         --pos2;
     while (pos1 <= pos2 && isspace(expr[pos1])) /* Ignore leading whitespace */
         ++pos1;
     if (pos1 > pos2) /* Expression consisted of all white space */
-        return SUCCESS; /* Do nothing */
+        return true; /* Do nothing */
     i = pos1;
     if (expr[i] == '{') /* Statement is a braced expression. Move i to the matching brace */
     {
@@ -171,7 +150,7 @@ int parseExpr(char *expr, char *s, char *op, char *e)
         if (!ok) /* Failed to match brace */
         {
             fprintf(stderr, "parser: failed to match brace\n");
-            return FAIL;
+            return false;
         }
         ++i; /* Move past the matched brace */
     }
@@ -197,7 +176,7 @@ int parseExpr(char *expr, char *s, char *op, char *e)
     {
         strncpy(s, expr + pos1, pos2 - pos1 + 1);
         s[pos2 - pos1 + 1] = '\0';
-        return SUCCESS;
+        return true;
     }
     strncpy(op, expr + opPos1, opPos2 - opPos1 + 1); /* Store the operator */
     op[opPos2 - opPos1 + 1] = '\0';
@@ -209,7 +188,54 @@ int parseExpr(char *expr, char *s, char *op, char *e)
     expStart = i; /* Mark the start of the right hand expression */
     strncpy(e, expr + expStart, pos2 - expStart + 1);
     e[pos2 - expStart + 1] = '\0';
-    return SUCCESS;
+    return true;
+}
+
+/* Parse a string into a command and list of args */
+bool parseCmd(char *s, const unsigned int MAX_ARGS, char *cmd, char **argv, unsigned int *numArgs, bool *isBg)
+{
+    int pos1 = 0;
+    int pos2 = strlen(s) - 1;
+    int tokPos1 = INVALID_POS;
+    int tokPos2 = INVALID_POS;
+    unsigned int i = 0;
+    /* Initialize return values */
+    cmd[0] = '\0';
+    *numArgs = 0;
+    *isBg = false;
+    if (strlen(s) == 0) /* Empty expression passed */
+        return true;
+    while (pos2 > pos1 && isspace(s[pos2])) /* Remove trailing whitespace */
+        --pos2;
+    while (pos1 <= pos2 && isspace(s[pos1])) /* Ignore leading whitespace */
+        ++pos1;
+    if (pos1 > pos2) /* Expression consisted of all white space */
+        return true; /* Do nothing */
+    if (pos2 - pos1 > 0 && s[pos2] == '&' && s[pos2 - 1] == ' ') /* & was passed to run process in background */
+    {
+        *isBg = true;
+        /* Remove & from the argument list */
+        --pos2;
+        while (pos2 > pos1 && isspace(s[pos2]))
+            --pos2;
+    }
+    /* Extract the first space delineated token and store in cmd */
+    tokPos1 = tokPos2 = pos1;
+    while (tokPos2 < pos2 && !isspace(s[tokPos2]))
+        ++tokPos2;
+    strncpy(cmd, s + tokPos1, tokPos2 - tokPos1 + 1);
+    while (i < MAX_ARGS && tokPos2 < pos2)
+    {
+        while (tokPos2 < pos2 && isspace(s[tokPos2]))
+            ++tokPos2;
+        tokPos1 = tokPos2;
+        while (tokPos2 < pos2 && !isspace(s[tokPos2]))
+            ++tokPos2;
+        strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1 + 1);
+        ++i;
+    }
+    *numArgs = i;
+    return true;
 }
 
 /* TODO: Rewrite this to pipe properly */
@@ -318,11 +344,25 @@ int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
 /* Test driver */
 int main()
 {
-    char expr[BUFF_MAX] = "{ { good braces } } | piped"; /* Test expression */
-    char s[BUFF_MAX];
-    char op[BUFF_MAX];
-    char e[BUFF_MAX];
-    int r = parseExpr(expr, s, op, e);
-    printf("Expression parsed: %s\n", expr);
-    printf("Return code: %d\ns: %s\nop: %s\ne: %s\n", r, s, op, e);
+    char *s = "ffmpeg    -i foo.mp4   bar.mkv  & ";
+    char cmd[BUFF_MAX];
+    char *args[3];
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+        args[i] = (char*) malloc(sizeof(char) * BUFF_MAX);
+    }
+    bool isBg;
+    unsigned int numArgs;
+    printf("Command parsed: %s\n", s);
+    parseCmd(s, 3, cmd, args, &numArgs, &isBg);
+    printf("Command: %s\n", cmd);
+    printf("Background: %d\n", isBg);
+    printf("Number of arguments: %d\n", numArgs);
+    puts("Args...");
+    for (int i = 0; i < 3; ++i)
+    {
+        puts(args[i]);
+        free(args[i]);
+    }
+    return 0;
 }
