@@ -49,8 +49,8 @@ bool isOp(char *s)
     }
 }
 
-/* Move i to matching closing brace */
-bool matchBrace(char *s, int *pos, unsigned int maxPos)
+/* Move pos to matching closing brace */
+bool matchBrace(char *s, int *pos, const unsigned int maxPos)
 {
     if (s[*pos] != '{')
     {
@@ -77,7 +77,7 @@ bool matchBrace(char *s, int *pos, unsigned int maxPos)
 }
 
 /* Move i to matching closing closing */
-bool matchQuote(char *s, int *pos, unsigned int maxPos)
+bool matchQuote(char *s, int *pos, const unsigned int maxPos)
 {
     if (s[*pos] != '\"')
     {
@@ -118,7 +118,13 @@ int evalS(char *s, int pos1, int pos2, char *inBuff, char *outBuff)
     return 0; /* Placeholder */
 }
 
-/* Parse the given expression into a left statement, operator, and right expression */
+/*
+ Parse the given expression into a left statement, operator, and right expression
+ expr: Expression to be parsed
+ s: String to store the resulting statement
+ op: String to store the resulting operator
+ e: String to store the resulting right expression
+*/
 bool parseExpr(char *expr, char *s, char *op, char *e)
 {
     int pos1 = 0;
@@ -191,7 +197,15 @@ bool parseExpr(char *expr, char *s, char *op, char *e)
     return true;
 }
 
-/* Parse a string into a command and list of args */
+/*
+ Parse a string into a command and list of args
+ s: Statement to parse
+ MAX_ARGS: The maximum number of arguments argv can store
+ cmd: String to store the resulting command
+ argv: String array to store the resulting arguments
+ numArgs: Returns the number of arguments extracted
+ isBg: Returns if a & was passed to indicate a background process
+*/
 bool parseCmd(char *s, const unsigned int MAX_ARGS, char *cmd, char **argv, unsigned int *numArgs, bool *isBg)
 {
     int pos1 = 0;
