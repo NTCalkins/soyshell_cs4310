@@ -19,6 +19,7 @@ int main(int argc, char **argv)
     
     printf("Old working directory: %s\n", getcwd(cwd, sizeof(cwd)));
 
+    // Changes directory still? I think?
     if (chdir(argv[1]) == -1) {
         perror("Failed to change directory.");
         return -1;
