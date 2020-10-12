@@ -252,6 +252,47 @@ bool parseCmd(char *s, const unsigned int MAX_ARGS, char *cmd, char **argv, unsi
     return true;
 }
 
+/*
+  Parse the statement into either an expression or a command
+  If s is an expression enclosed in braces, it will be stored in e and cmd will be the empty string
+  If s is simply a command, it will be stored in cmd and e will be the empty string
+  s: The statement to be parsed
+  e: String to store the parsed expression
+  cmd: String to store the parsed command
+*/
+bool parseS(char *s, char *e, char *cmd)
+{
+    int pos1 = 0;
+    int pos2 = strlen(s) - 1;
+    e[0] = '\0';
+    cmd[0] = '\0';
+    if (strlen(s) == 0) /* Empty expression passed */
+        return true;
+    while (pos2 > pos1 && isspace(s[pos2])) /* Remove trailing whitespace */
+        --pos2;
+    while (pos1 <= pos2 && isspace(s[pos1])) /* Ignore leading whitespace */
+        ++pos1;
+    if (s[pos1] == '{') /* Statement is an expression enclosed in braces */
+    {
+        if (s[pos2] != '}')
+        {
+            fprintf(stderr, "parseS: expression not properly enclosed in braces\n");
+            return false;
+        }
+        --pos2;
+        while (pos2 > pos1 && isspace(s[pos2]))
+            --pos2;
+        /* Return the expression */
+        strncpy(e, s + pos1, pos2 - pos1 + 1);
+        s[pos2 - pos1 + 1] = '\0';
+        return true;
+    }
+    /* Statement is a command */
+    strncpy(cmd, s + pos1, pos2 - pos1 + 1);
+    s[pos2 - pos1 + 1] = '\0';
+    return true;
+}
+
 /* TODO: Rewrite this to pipe properly */
 /* Evaluate the expression. Assume that there are no trailing whitespaces */
 int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
