@@ -12,11 +12,95 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <unistd.h>
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
 #define INVALID_POS -1
+#define INIT_CONSTS 8 /* Initial number of constants to allocate memory for */
+#define PATH_SEP ':' /* Character used to seperate entries in the path */
 
-bool isOp(char *s);
-bool matchBrace(char *s, int *pos, unsigned int maxPos);
+char ***consts; /* Array of string pairs to store user defined constants. If we have more time, this should be replaced with a BST */
+unsigned int numConsts; /* Current number of constants ie. next free index */
+unsigned int maxConsts; /* Current maximum number of user defined constants */
+
+/* Initialize the global variables */
+void init()
+{
+    maxConsts = INIT_CONSTS;
+    numConsts = 0;
+    consts = (char***) malloc(maxConsts * sizeof(char**));
+    /* Reserve the 0th index for the PATH variable */
+    consts[numConsts] = (char**) malloc(2 * sizeof(char*));
+    consts[numConsts][0] = (char*) malloc(BUFF_MAX * sizeof(char));
+    consts[numConsts][1] = (char*) malloc(BUFF_MAX * sizeof(char));
+    strcpy(consts[numConsts][0], "PATH");
+    /* For the purpose of the assignment, we will make the assumption that the executable is called in the root of the
+       repo and the default path will be the repo's bin folder */
+    getcwd(consts[numConsts][1], BUFF_MAX);
+    strcat(consts[numConsts][1], "/bin");
+    ++numConsts;
+}
+
+/* Clean up global variables */
+void finish()
+{
+    for (unsigned int i = 0; i < numConsts; ++i)
+    {
+        free(consts[i][0]);
+        free(consts[i][1]);
+        free(consts[i]);
+    }
+    free(consts);
+}
+
+/* Define a constant with the specified key and value */
+bool addConst(char *key, char *val)
+{
+    if (strlen(key) > BUFF_MAX - 1)
+    {
+        fprintf(stderr, "addConst: length of key exceeds BUFF_MAX\n");
+        return false;
+    }
+    if (strlen(val) > BUFF_MAX - 1)
+    {
+        fprintf(stderr, "addConst: length of val exceeds BUFF_MAX\n");
+        return false;
+    }
+    for (unsigned int i = 0; i < strlen(key); ++i)
+    {
+        if (!isalpha(key[i]))
+        {
+            fprintf(stderr, "addConst: key must be alphabetic\n");
+            return false;
+        }
+    }
+    consts[numConsts] = (char**) malloc(2 * sizeof(char*));
+    consts[numConsts][0] = (char*) malloc(BUFF_MAX * sizeof(char));
+    consts[numConsts][1] = (char*) malloc(BUFF_MAX * sizeof(char));
+    strcpy(consts[numConsts][0], key);
+    strcpy(consts[numConsts][1], val);
+    ++numConsts;
+    if (numConsts == maxConsts) /* Need to expand the array */
+    {
+        maxConsts *= 2;
+        consts = (char***) realloc(consts, maxConsts * sizeof(char***));
+    }
+    return true;
+}
+
+/*
+  Get the string associated with the key
+  Returns NULL on failure
+*/
+char* getConst(char *key)
+{
+    /* Due to time constraints, this will just be a linear search for now */
+    for (unsigned int i = 0; i < numConsts; ++i)
+    {
+        if (strcmp(key, consts[i][0]) == 0) /* Found it */
+            return consts[i][1];
+    }
+    return NULL;
+}
 
 /* Check if the string is a valid operator */
 bool isOp(char *s)
@@ -97,11 +181,48 @@ bool matchQuote(char *s, int *pos, const unsigned int maxPos)
     return true;
 }
 
-/* Evaluate the argument */
-char* evalArg(char *s)
+/*
+  Evaluate the argument
+  This just expands any user defined constants preceeded by a $
+*/
+char* evalArg(char *arg)
 {
-    /* TODO: Implement this */
-    return NULL; /* Placeholder */
+    int pos1 = 0;
+    int pos2 = strlen(arg);
+    int keyPos1 = INVALID_POS;
+    int keyPos2 = INVALID_POS;
+    int i = 0;
+    char key[BUFF_MAX] = "";
+    char *val = NULL;
+    char temp[BUFF_MAX] = "";
+    temp[0] = '\0';
+    while (pos1 < pos2)
+    {
+        while (i < pos2 && arg[i] != '$')
+            ++i;
+        if (i == pos2) /* No $ in arg */
+            break;
+        /* Else found a $ */
+        keyPos1 = keyPos2 = i + 1;
+        while (keyPos2 <= pos2 && isalpha(arg[keyPos2])) /* Read key until we hit a non-alpha character or end of string */
+            ++keyPos2;
+        if (keyPos2 - keyPos1 > BUFF_MAX - 1)
+        {
+            fprintf(stderr, "evalArg: key length exceeds BUFF_MAX\n");
+            return arg;
+        }
+        strncpy(key, arg + keyPos1, keyPos2 - keyPos1);
+        key[keyPos2 - keyPos1] = '\0';
+        val = getConst(key);
+        strncpy(temp + pos1, arg + pos1, i - pos1);
+        temp[i] = '\0';
+        strcat(temp, val);
+        pos1 = i = keyPos2;
+    }
+    if (pos1 < pos2)
+        strcat(temp, arg + pos1); /* Add the remainder of the arg */
+    strcpy(arg, temp);
+    return arg;
 }
 
 /* Evaluate the command or run the executable */
@@ -399,25 +520,29 @@ int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
 /* Test driver */
 int main()
 {
-    char *s = "ffmpeg    -i foo.mp4   bar.mkv  & ";
-    char cmd[BUFF_MAX];
-    char *args[3];
-    for (unsigned int i = 0; i < 3; ++i)
-    {
-        args[i] = (char*) malloc(sizeof(char) * BUFF_MAX);
-    }
-    bool isBg;
-    unsigned int numArgs;
-    printf("Command parsed: %s\n", s);
-    parseCmd(s, 3, cmd, args, &numArgs, &isBg);
-    printf("Command: %s\n", cmd);
-    printf("Background: %d\n", isBg);
-    printf("Number of arguments: %d\n", numArgs);
-    puts("Args...");
-    for (int i = 0; i < 3; ++i)
-    {
-        puts(args[i]);
-        free(args[i]);
-    }
+    init();
+    char *arg = (char*) malloc(BUFF_MAX * sizeof(char));
+    strcpy(arg, "$PATH/blah/blah/blah");
+    printf("Before expansion: %s\n", arg);
+    evalArg(arg);
+    printf("After expansion: %s\n\n", arg);
+    strcpy(arg, "pre-blah/$PATH/post-blah/post-blah");
+    printf("Before expansion: %s\n", arg);
+    evalArg(arg);
+    printf("After expansion: %s\n\n", arg);
+    strcpy(arg, "pre-blah/pre-blah/$PATH/post-blah");
+    printf("Before expansion: %s\n", arg);
+    evalArg(arg);
+    printf("After expansion: %s\n\n", arg);
+    strcpy(arg, "no constant here");
+    printf("Before expansion: %s\n", arg);
+    evalArg(arg);
+    printf("After expansion: %s\n\n", arg);
+    strcpy(arg, "");
+    printf("Before expansion: %s\n", arg);
+    evalArg(arg);
+    printf("After expansion: %s\n\n", arg);
+    free(arg);
+    finish();
     return 0;
 }
