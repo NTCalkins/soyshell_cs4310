@@ -89,7 +89,7 @@ bool addConst(char *key, char *val)
 
 /*
   Get the string associated with the key
-  Returns NULL on failure
+  Returns blank string on failure
 */
 char* getConst(char *key)
 {
@@ -99,7 +99,7 @@ char* getConst(char *key)
         if (strcmp(key, consts[i][0]) == 0) /* Found it */
             return consts[i][1];
     }
-    return NULL;
+    return "";
 }
 
 /* Check if the string is a valid operator */
@@ -539,6 +539,10 @@ int main()
     evalArg(arg);
     printf("After expansion: %s\n\n", arg);
     strcpy(arg, "");
+    printf("Before expansion: %s\n", arg);
+    evalArg(arg);
+    printf("After expansion: %s\n\n", arg);
+    strcpy(arg, "pre-blah/$NOEXIST/post-blah");
     printf("Before expansion: %s\n", arg);
     evalArg(arg);
     printf("After expansion: %s\n\n", arg);
