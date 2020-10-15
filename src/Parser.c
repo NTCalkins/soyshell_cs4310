@@ -16,7 +16,6 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
 #define INVALID_POS -1
 #define INIT_CONSTS 8 /* Initial number of constants to allocate memory for */
@@ -374,7 +373,7 @@ bool parseExpr(char *expr, char *s, char *op, char *e)
 /*
  Parse a string into a command and list of args
  s: Statement to parse
- MAX_ARGS: The maximum number of arguments argv can store
+ MAX_ARGS: The maximum number of arguments argv can store. This includes the NULL terminator
  cmd: String to store the resulting command
  argv: String array to store the resulting arguments
  numArgs: Returns the number of arguments extracted
@@ -415,7 +414,7 @@ bool parseCmd(char *s, const unsigned int MAX_ARGS, char *cmd, char **argv, unsi
     /* First element of argv is always the name of the command */
     strcpy(argv[i], cmd);
     ++i;
-    while (i < MAX_ARGS && tokPos2 < pos2)
+    while (i < MAX_ARGS - 1 && tokPos2 < pos2)
     {
         while (tokPos2 < pos2 && isspace(s[tokPos2]))
             ++tokPos2;
@@ -425,6 +424,7 @@ bool parseCmd(char *s, const unsigned int MAX_ARGS, char *cmd, char **argv, unsi
         strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1 + 1);
         ++i;
     }
+    argv[i] = NULL; /* Terminate list of args with NULL */
     *numArgs = i;
     return true;
 }
