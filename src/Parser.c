@@ -6,6 +6,9 @@
   op: && / || / | / ; / < / << / > / >>
   cmd: All supported commands (ls, mv, etc.) / Assignment statement
   arg: $(expr) / $NAMED_CONSTANT / LITERAL / WILDCARD
+
+  IMPORTANT: Don't forget to call init() to intialize the array of user
+  defined constants and finish() to cleanup the array
 */
 #include <stdbool.h>
 #include <string.h>
@@ -13,10 +16,10 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
 #define INVALID_POS -1
 #define INIT_CONSTS 8 /* Initial number of constants to allocate memory for */
-#define PATH_SEP ':' /* Character used to seperate entries in the path */
 
 char ***consts; /* Array of string pairs to store user defined constants. If we have more time, this should be replaced with a BST */
 unsigned int numConsts; /* Current number of constants ie. next free index */
@@ -225,15 +228,65 @@ char* evalArg(char *arg)
     return arg;
 }
 
-/* Evaluate the command or run the executable */
-int evalCmd(char *cmd, char *args, char *inBuff, char *outBuff)
+/* Evaluate the command and run the executable */
+int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
 {
     /* TODO: Implement this */
-    return 0; /* Placeholder */
+    char path[BUFF_MAX]; /* String to store the current value of PATH */
+    char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
+    strcpy(path, consts[0][1]); /* Get the current PATH value */
+    char *tok = NULL;
+    bool isPath = false; /* Is the given command already a path to an executable */
+    for (unsigned int i = 0; i < strlen(cmd); ++i) /* Look for a '/' to signal that cmd is already a path */
+    {
+        if (cmd[i] == '/')
+        {
+            isPath = true;
+            break;
+        }
+    }
+    if (isPath)
+    {
+        if (access(cmd, X_OK) != -1) /* Found an appropriate executable */
+        {
+            /* TODO: Run the executable */
+            if (isBg)
+            {
+                /* TODO: Run it as a background process */
+                return 0;
+            }
+            /* Else run it normally */
+            
+        }
+    }
+    else
+    {
+        tok = strtok(path, ":");
+        while (tok != NULL)
+        {
+            /* Generate possible executable path using value in PATH and cmd */
+            strcpy(execPath, tok);
+            strcat(execPath, "/");
+            strcat(execPath, cmd);
+            if (access(execPath, X_OK) != -1) /* Found an appropriate executable */
+            {
+                /* TODO: Run the executable */
+                if (isBg)
+                {
+                    /* TODO: Run it as a background process */
+                    return 0;
+                }
+                /* Else run it normally */
+            }
+            tok = strtok(NULL, ":");
+        }
+    }
+    fprintf(stderr, "\'%s\' is not a valid command\n", cmd);
+    return 1;
 }
 
 /* Evaluate the statement */
-int evalS(char *s, int pos1, int pos2, char *inBuff, char *outBuff)
+int evalS(char *s)
 {
     /* TODO: Implement this */
     return 0; /* Placeholder */
@@ -359,6 +412,9 @@ bool parseCmd(char *s, const unsigned int MAX_ARGS, char *cmd, char **argv, unsi
     while (tokPos2 < pos2 && !isspace(s[tokPos2]))
         ++tokPos2;
     strncpy(cmd, s + tokPos1, tokPos2 - tokPos1 + 1);
+    /* First element of argv is always the name of the command */
+    strcpy(argv[i], cmd);
+    ++i;
     while (i < MAX_ARGS && tokPos2 < pos2)
     {
         while (tokPos2 < pos2 && isspace(s[tokPos2]))
@@ -530,7 +586,7 @@ int main()
     printf("Before expansion: %s\n", arg);
     evalArg(arg);
     printf("After expansion: %s\n\n", arg);
-    strcpy(arg, "pre-blah/pre-blah/$PATH/post-blah");
+    strcpy(arg, "pre-blah/pre-blah/$PATH");
     printf("Before expansion: %s\n", arg);
     evalArg(arg);
     printf("After expansion: %s\n\n", arg);
@@ -543,6 +599,10 @@ int main()
     evalArg(arg);
     printf("After expansion: %s\n\n", arg);
     strcpy(arg, "pre-blah/$NOEXIST/post-blah");
+    printf("Before expansion: %s\n", arg);
+    evalArg(arg);
+    printf("After expansion: %s\n\n", arg);
+    strcpy(arg, "$PATH");
     printf("Before expansion: %s\n", arg);
     evalArg(arg);
     printf("After expansion: %s\n\n", arg);
