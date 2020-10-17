@@ -355,11 +355,11 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsig
         }
         else
         {
-            while (tokPos2 < pos2 && !isspace(s[tokPos2]))
+            while (tokPos2 <= pos2 && !isspace(s[tokPos2]))
                 ++tokPos2;
             argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
-            strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1 + 1);
-            argv[i][tokPos2 - tokPos1 + 1] = '\0';
+            strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1);
+            argv[i][tokPos2 - tokPos1] = '\0';
             evalArg(argv[i]); /* Expand any user defined constants in the arg */
         }
         ++i;
