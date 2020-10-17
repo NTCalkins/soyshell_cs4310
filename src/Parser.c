@@ -357,6 +357,7 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsig
                 ++tokPos2;
             argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
             strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1 + 1);
+            evalArg(argv[i]); /* Expand any user defined constants in the arg */
         }
         ++i;
     }
@@ -523,9 +524,7 @@ int evalS(char *s)
     if (strlen(cmd) == 0) /* Statement is a braced expression */
         return evalExpr(e);
     /* Else statement is a command */
-    parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
-    for (unsigned int i = 0; i < numArgs; ++i) /* Expand any user defined constants in the arguments*/
-        evalArg(argv[i]);
+    parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);    
     int r = evalCmd(cmd, numArgs, argv, isBg);
     /* Clean up argv */
     for (unsigned int i = 0; i < numArgs; ++i)
