@@ -440,6 +440,11 @@ char* evalArg(char *arg)
         strncpy(key, arg + keyPos1, keyPos2 - keyPos1);
         key[keyPos2 - keyPos1] = '\0';
         val = getConst(key);
+        if (strlen(val) + strlen(temp) + (keyPos1 - pos1 - 1) > BUFF_MAX - 1)
+        {
+            fprintf(stderr, "evalArg: expanded length exceeds BUFF_MAX\n");
+            return arg;
+        }
         strncat(temp, arg + pos1, keyPos1 - pos1 - 1);
         strcat(temp, val);
         pos1 = i = keyPos2;
@@ -654,7 +659,8 @@ int main()
         puts(argv[i]);
         free(argv[i]);
     }
-    char arg[BUFF_MAX] = "Double/$PATH/blah/$PATH/Constant";
+    addConst("EDITOR", "emacs");
+    char arg[BUFF_MAX] = "SuperLong$EDITOR$EDITOR$EDITOR$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH";
     printf("Before expansion: %s\n", arg);
     puts(evalArg(arg));
     finish();
