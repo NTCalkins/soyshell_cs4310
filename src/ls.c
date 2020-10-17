@@ -16,9 +16,10 @@ int main(int argc, char** argv) {
 		printf("directory cannot be read.\n");
 		return 0;
 	}
-
-	while ((dir = readdir(d)) != NULL) {
+        dir = readdir(d);
+	while (dir != NULL) {
 		printf("%s\n", dir->d_name);
+                dir = readdir(d);
 	}
 	closedir(d);
 	return 0;
