@@ -323,9 +323,10 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsig
     }
     /* Extract the first space delineated token and store in cmd */
     tokPos1 = tokPos2 = pos1;
-    while (tokPos2 < pos2 && !isspace(s[tokPos2]))
+    while (tokPos2 <= pos2 && !isspace(s[tokPos2]))
         ++tokPos2;
-    strncpy(cmd, s + tokPos1, tokPos2 - tokPos1 + 1);
+    strncpy(cmd, s + tokPos1, tokPos2 - tokPos1);
+    cmd[tokPos2 - tokPos1] = '\0';
     /* First element of argv is always the name of the command */
     argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
     strcpy(argv[i], cmd);
@@ -349,6 +350,7 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsig
             argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
             /* Take away the quotes and copy into argv */
             strncpy(argv[i], s + tokPos1 + 1, tokPos2 - tokPos1 - 1);
+            argv[i][tokPos2 - tokPos1 - 1] = '\0';
             ++tokPos2; /* Move past end quote */
         }
         else
@@ -357,6 +359,7 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsig
                 ++tokPos2;
             argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
             strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1 + 1);
+            argv[i][tokPos2 - tokPos1 + 1] = '\0';
             evalArg(argv[i]); /* Expand any user defined constants in the arg */
         }
         ++i;
@@ -539,7 +542,7 @@ int evalS(char *s)
     if (strlen(cmd) == 0) /* Statement is a braced expression */
         return evalExpr(e);
     /* Else statement is a command */
-    parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);    
+    parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
     int r = evalCmd(cmd, numArgs, argv, isBg);
     /* Clean up argv */
     for (unsigned int i = 0; i < numArgs; ++i)
@@ -703,6 +706,6 @@ int main() {
             int r = evalS(command);
         }
     }
-
+    finish();
     return 0;
 }
