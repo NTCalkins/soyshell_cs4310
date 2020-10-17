@@ -440,8 +440,7 @@ char* evalArg(char *arg)
         strncpy(key, arg + keyPos1, keyPos2 - keyPos1);
         key[keyPos2 - keyPos1] = '\0';
         val = getConst(key);
-        strncpy(temp + pos1, arg + pos1, i - pos1);
-        temp[i] = '\0';
+        strncat(temp, arg + pos1, keyPos1 - pos1 - 1);
         strcat(temp, val);
         pos1 = i = keyPos2;
     }
@@ -655,6 +654,9 @@ int main()
         puts(argv[i]);
         free(argv[i]);
     }
+    char arg[BUFF_MAX] = "Double/$PATH/blah/$PATH/Constant";
+    printf("Before expansion: %s\n", arg);
+    puts(evalArg(arg));
     finish();
     return 0;
 }
