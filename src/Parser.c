@@ -440,12 +440,8 @@ char* evalArg(char *arg)
         strncpy(key, arg + keyPos1, keyPos2 - keyPos1);
         key[keyPos2 - keyPos1] = '\0';
         val = getConst(key);
-        if (strlen(val) + strlen(temp) + (keyPos1 - pos1 - 1) > BUFF_MAX - 1)
-        {
-            fprintf(stderr, "evalArg: expanded length exceeds BUFF_MAX\n");
-            return arg;
-        }
-        strncat(temp, arg + pos1, keyPos1 - pos1 - 1);
+        strncpy(temp + pos1, arg + pos1, i - pos1);
+        temp[i] = '\0';
         strcat(temp, val);
         pos1 = i = keyPos2;
     }
@@ -464,6 +460,20 @@ int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
     strcpy(path, consts[0][1]); /* Get the current PATH value */
     char *tok = NULL;
     bool isPath = false; /* Is the given command already a path to an executable */
+    char *ptr = argv[0];
+    if (*ptr == 'c' && *(++ptr) == 'd' && *(++ptr) == ' ') {
+        if (argc != 2) {
+            printf("Only one argument allowed\n");
+        }
+        int r = chdir(argv[1]);
+        if (r == 0) {
+            return 0;
+        }
+        else {
+            printf("cd %s: No such file or directory\n", argv[1]);
+        }
+    }
+
     for (unsigned int i = 0; i < strlen(cmd); ++i) /* Look for a '/' to signal that cmd is already a path */
     {
         if (cmd[i] == '/')
@@ -641,28 +651,57 @@ int evalExpr(char *expr)
 }
 
 /* Test driver */
-int main()
-{
-    init();
-    char s[BUFF_MAX] = "foo \"nice and\" \"quoted arguments\" please work &";
-    char cmd[BUFF_MAX] = "";
-    unsigned int numArgs;
-    bool isBg;
-    char *argv[MAX_ARGS] = {};
-    parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
-    printf("Command parsed: %s\n", s);
-    printf("Number of arguments: %d\n", numArgs);
-    printf("Background: %d\n", isBg);
-    printf("Arguments...\n");
-    for (unsigned int i = 0; i < numArgs; ++i)
-    {
-        puts(argv[i]);
-        free(argv[i]);
+// int main()
+// {
+//     init();
+//     char s[BUFF_MAX] = "cd \"nice and\" \"quoted arguments\" please work &";
+//     char cmd[BUFF_MAX] = "";
+//     unsigned int numArgs;
+//     bool isBg;
+//     char *argv[MAX_ARGS] = {};
+//     parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
+//     printf("Command parsed: %s\n", s);
+//     printf("Number of arguments: %d\n", numArgs);
+//     printf("Background: %d\n", isBg);
+//     printf("Arguments...\n");
+//     for (unsigned int i = 0; i < numArgs; ++i)
+//     {
+//         puts(argv[i]);
+//         free(argv[i]);
+//     }
+//     finish();
+//     return 0;
+// }
+
+char *read_command(void) {
+    char *command = NULL;
+    long unsigned n = 0;
+
+    if (getline(&command, &n, stdin) == -1) {
+        return command;
     }
-    addConst("EDITOR", "emacs");
-    char arg[BUFF_MAX] = "SuperLong$EDITOR$EDITOR$EDITOR$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH$PATH";
-    printf("Before expansion: %s\n", arg);
-    puts(evalArg(arg));
-    finish();
+    return command;
+}
+
+int main() {
+
+    init();
+
+    char d[1024];
+    if (getcwd(d, sizeof(d)) != NULL) {
+        //TODO: Account for some kind of invalid read of path
+    }
+    char *command;
+    while (1) {
+        getcwd(d, sizeof(d));
+        printf("%s> ", d);
+        command = read_command();
+        if (strcmp(command, "exit\n") == 0)
+            return 0;
+        else {
+            int r = evalS(command);
+        }
+    }
+
     return 0;
 }
