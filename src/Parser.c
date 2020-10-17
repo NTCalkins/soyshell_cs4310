@@ -27,6 +27,21 @@ char ***consts; /* Array of string pairs to store user defined constants. If we 
 unsigned int numConsts; /* Current number of constants ie. next free index */
 unsigned int maxConsts; /* Current maximum number of user defined constants */
 
+void init();
+void finish();
+bool addConst(char*, char*);
+char* getConst(char*);
+bool isOp(char*);
+bool matchBrace(char*, int*, const unsigned int);
+bool matchQuote(char*, int*, const unsigned int);
+bool parseExpr(char*, char*, char*, char*);
+bool parseCmd(char*, const unsigned int, char*, char**, unsigned int*, bool*);
+bool parseS(char*, char*, char*);
+char* evalArg(char*);
+int evalCmd(char*, unsigned int, char**, bool);
+int evalS(char*);
+int evalExpr(char*);
+
 /* Initialize the global variables */
 void init()
 {
@@ -165,7 +180,7 @@ bool matchBrace(char *s, int *pos, const unsigned int maxPos)
     return true;
 }
 
-/* Move i to matching closing closing */
+/* Move pos to matching closing closing */
 bool matchQuote(char *s, int *pos, const unsigned int maxPos)
 {
     if (s[*pos] != '\"')
@@ -315,10 +330,29 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsig
         while (tokPos2 < pos2 && isspace(s[tokPos2]))
             ++tokPos2;
         tokPos1 = tokPos2;
-        while (tokPos2 < pos2 && !isspace(s[tokPos2]))
-            ++tokPos2;
-        argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
-        strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1 + 1);
+        if (s[tokPos1] == '\"') /* Quoted argument */
+        {
+            bool ok = matchQuote(s, &tokPos2, pos2);
+            if (!ok) /* Could not match quote */
+            {
+                fprintf(stderr, "parseCmd: could not parse all arguments\n");
+                /* Terminate argv early */
+                argv[i] = NULL;
+                *numArgs = i;
+                return false;
+            }
+            argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
+            /* Take away the quotes and copy into argv */
+            strncpy(argv[i], s + tokPos1 + 1, tokPos2 - tokPos1 - 1);
+            ++tokPos2; /* Move past end quote */
+        }
+        else
+        {
+            while (tokPos2 < pos2 && !isspace(s[tokPos2]))
+                ++tokPos2;
+            argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
+            strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1 + 1);
+        }
         ++i;
     }
     argv[i] = NULL; /* Terminate list of args with NULL */
@@ -600,36 +634,21 @@ int evalExpr(char *expr)
 int main()
 {
     init();
-    char *arg = (char*) malloc(BUFF_MAX * sizeof(char));
-    strcpy(arg, "$PATH/blah/blah/blah");
-    printf("Before expansion: %s\n", arg);
-    evalArg(arg);
-    printf("After expansion: %s\n\n", arg);
-    strcpy(arg, "pre-blah/$PATH/post-blah/post-blah");
-    printf("Before expansion: %s\n", arg);
-    evalArg(arg);
-    printf("After expansion: %s\n\n", arg);
-    strcpy(arg, "pre-blah/pre-blah/$PATH");
-    printf("Before expansion: %s\n", arg);
-    evalArg(arg);
-    printf("After expansion: %s\n\n", arg);
-    strcpy(arg, "no constant here");
-    printf("Before expansion: %s\n", arg);
-    evalArg(arg);
-    printf("After expansion: %s\n\n", arg);
-    strcpy(arg, "");
-    printf("Before expansion: %s\n", arg);
-    evalArg(arg);
-    printf("After expansion: %s\n\n", arg);
-    strcpy(arg, "pre-blah/$NOEXIST/post-blah");
-    printf("Before expansion: %s\n", arg);
-    evalArg(arg);
-    printf("After expansion: %s\n\n", arg);
-    strcpy(arg, "$PATH");
-    printf("Before expansion: %s\n", arg);
-    evalArg(arg);
-    printf("After expansion: %s\n\n", arg);
-    free(arg);
+    char s[BUFF_MAX] = "foo \"nice and\" \"quoted arguments\" please work &";
+    char cmd[BUFF_MAX] = "";
+    unsigned int numArgs;
+    bool isBg;
+    char *argv[MAX_ARGS] = {};
+    parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
+    printf("Command parsed: %s\n", s);
+    printf("Number of arguments: %d\n", numArgs);
+    printf("Background: %d\n", isBg);
+    printf("Arguments...\n");
+    for (unsigned int i = 0; i < numArgs; ++i)
+    {
+        puts(argv[i]);
+        free(argv[i]);
+    }
     finish();
     return 0;
 }
