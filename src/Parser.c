@@ -461,7 +461,7 @@ int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
     char *tok = NULL;
     bool isPath = false; /* Is the given command already a path to an executable */
     char *ptr = argv[0];
-    if (*ptr == 'c' && *(++ptr) == 'd' && *(++ptr) == ' ') {
+    if (*ptr == 'c' && *(++ptr) == 'd') {
         if (argc != 2) {
             printf("Only one argument allowed\n");
         }
@@ -471,6 +471,7 @@ int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
         }
         else {
             printf("cd %s: No such file or directory\n", argv[1]);
+            return 1;
         }
     }
 
