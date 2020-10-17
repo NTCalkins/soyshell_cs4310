@@ -85,11 +85,16 @@ bool addConst(char *key, char *val)
         fprintf(stderr, "addConst: length of val exceeds BUFF_MAX\n");
         return false;
     }
-    for (unsigned int i = 0; i < strlen(key); ++i)
+    if (!isalpha(key[0]))
     {
-        if (!isalpha(key[i]))
+        fprintf(stderr, "addConst: key must start with an alphabetical character\n");
+        return false;
+    }
+    for (unsigned int i = 1; i < strlen(key); ++i)
+    {
+        if (!isalnum(key[i]))
         {
-            fprintf(stderr, "addConst: key must be alphabetic\n");
+            fprintf(stderr, "addConst: key must be alpha-numeric\n");
             return false;
         }
     }
@@ -424,7 +429,7 @@ char* evalArg(char *arg)
             break;
         /* Else found a $ */
         keyPos1 = keyPos2 = i + 1;
-        while (keyPos2 <= pos2 && isalpha(arg[keyPos2])) /* Read key until we hit a non-alpha character or end of string */
+        while (keyPos2 <= pos2 && isalnum(arg[keyPos2])) /* Read key until we hit a non-alnum character or end of string */
             ++keyPos2;
         if (keyPos2 - keyPos1 > BUFF_MAX - 1)
         {
@@ -519,6 +524,8 @@ int evalS(char *s)
         return evalExpr(e);
     /* Else statement is a command */
     parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
+    for (unsigned int i = 0; i < numArgs; ++i) /* Expand any user defined constants in the arguments*/
+        evalArg(argv[i]);
     int r = evalCmd(cmd, numArgs, argv, isBg);
     /* Clean up argv */
     for (unsigned int i = 0; i < numArgs; ++i)
