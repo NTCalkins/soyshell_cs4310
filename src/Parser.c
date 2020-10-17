@@ -16,9 +16,12 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
 #define INVALID_POS -1
 #define INIT_CONSTS 8 /* Initial number of constants to allocate memory for */
+#define MAX_ARGS 1024 /* Maximum number of arguments in argv */
 
 char ***consts; /* Array of string pairs to store user defined constants. If we have more time, this should be replaced with a BST */
 unsigned int numConsts; /* Current number of constants ie. next free index */
@@ -184,114 +187,6 @@ bool matchQuote(char *s, int *pos, const unsigned int maxPos)
 }
 
 /*
-  Evaluate the argument
-  This just expands any user defined constants preceeded by a $
-*/
-char* evalArg(char *arg)
-{
-    int pos1 = 0;
-    int pos2 = strlen(arg);
-    int keyPos1 = INVALID_POS;
-    int keyPos2 = INVALID_POS;
-    int i = 0;
-    char key[BUFF_MAX] = "";
-    char *val = NULL;
-    char temp[BUFF_MAX] = "";
-    temp[0] = '\0';
-    while (pos1 < pos2)
-    {
-        while (i < pos2 && arg[i] != '$')
-            ++i;
-        if (i == pos2) /* No $ in arg */
-            break;
-        /* Else found a $ */
-        keyPos1 = keyPos2 = i + 1;
-        while (keyPos2 <= pos2 && isalpha(arg[keyPos2])) /* Read key until we hit a non-alpha character or end of string */
-            ++keyPos2;
-        if (keyPos2 - keyPos1 > BUFF_MAX - 1)
-        {
-            fprintf(stderr, "evalArg: key length exceeds BUFF_MAX\n");
-            return arg;
-        }
-        strncpy(key, arg + keyPos1, keyPos2 - keyPos1);
-        key[keyPos2 - keyPos1] = '\0';
-        val = getConst(key);
-        strncpy(temp + pos1, arg + pos1, i - pos1);
-        temp[i] = '\0';
-        strcat(temp, val);
-        pos1 = i = keyPos2;
-    }
-    if (pos1 < pos2)
-        strcat(temp, arg + pos1); /* Add the remainder of the arg */
-    strcpy(arg, temp);
-    return arg;
-}
-
-/* Evaluate the command and run the executable */
-int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
-{
-    /* TODO: Implement this */
-    char path[BUFF_MAX]; /* String to store the current value of PATH */
-    char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
-    strcpy(path, consts[0][1]); /* Get the current PATH value */
-    char *tok = NULL;
-    bool isPath = false; /* Is the given command already a path to an executable */
-    for (unsigned int i = 0; i < strlen(cmd); ++i) /* Look for a '/' to signal that cmd is already a path */
-    {
-        if (cmd[i] == '/')
-        {
-            isPath = true;
-            break;
-        }
-    }
-    if (isPath)
-    {
-        if (access(cmd, X_OK) != -1) /* Found an appropriate executable */
-        {
-            /* TODO: Run the executable */
-            if (isBg)
-            {
-                /* TODO: Run it as a background process */
-                return 0;
-            }
-            /* Else run it normally */
-            
-        }
-    }
-    else
-    {
-        tok = strtok(path, ":");
-        while (tok != NULL)
-        {
-            /* Generate possible executable path using value in PATH and cmd */
-            strcpy(execPath, tok);
-            strcat(execPath, "/");
-            strcat(execPath, cmd);
-            if (access(execPath, X_OK) != -1) /* Found an appropriate executable */
-            {
-                /* TODO: Run the executable */
-                if (isBg)
-                {
-                    /* TODO: Run it as a background process */
-                    return 0;
-                }
-                /* Else run it normally */
-            }
-            tok = strtok(NULL, ":");
-        }
-    }
-    fprintf(stderr, "\'%s\' is not a valid command\n", cmd);
-    return 1;
-}
-
-/* Evaluate the statement */
-int evalS(char *s)
-{
-    /* TODO: Implement this */
-    return 0; /* Placeholder */
-}
-
-/*
  Parse the given expression into a left statement, operator, and right expression
  expr: Expression to be parsed
  s: String to store the resulting statement
@@ -373,13 +268,13 @@ bool parseExpr(char *expr, char *s, char *op, char *e)
 /*
  Parse a string into a command and list of args
  s: Statement to parse
- MAX_ARGS: The maximum number of arguments argv can store. This includes the NULL terminator
+ maxArgs: The maximum number of arguments argv can store. This includes the NULL terminator
  cmd: String to store the resulting command
- argv: String array to store the resulting arguments
+ argv: Array of unallocated character pointers to store the resulting arguments
  numArgs: Returns the number of arguments extracted
  isBg: Returns if a & was passed to indicate a background process
 */
-bool parseCmd(char *s, const unsigned int MAX_ARGS, char *cmd, char **argv, unsigned int *numArgs, bool *isBg)
+bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsigned int *numArgs, bool *isBg)
 {
     int pos1 = 0;
     int pos2 = strlen(s) - 1;
@@ -412,15 +307,17 @@ bool parseCmd(char *s, const unsigned int MAX_ARGS, char *cmd, char **argv, unsi
         ++tokPos2;
     strncpy(cmd, s + tokPos1, tokPos2 - tokPos1 + 1);
     /* First element of argv is always the name of the command */
+    argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
     strcpy(argv[i], cmd);
     ++i;
-    while (i < MAX_ARGS - 1 && tokPos2 < pos2)
+    while (i < maxArgs - 1 && tokPos2 < pos2)
     {
         while (tokPos2 < pos2 && isspace(s[tokPos2]))
             ++tokPos2;
         tokPos1 = tokPos2;
         while (tokPos2 < pos2 && !isspace(s[tokPos2]))
             ++tokPos2;
+        argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
         strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1 + 1);
         ++i;
     }
@@ -444,7 +341,7 @@ bool parseS(char *s, char *e, char *cmd)
     e[0] = '\0';
     cmd[0] = '\0';
     if (strlen(s) == 0) /* Empty expression passed */
-        return true;
+        return false;
     while (pos2 > pos1 && isspace(s[pos2])) /* Remove trailing whitespace */
         --pos2;
     while (pos1 <= pos2 && isspace(s[pos1])) /* Ignore leading whitespace */
@@ -470,9 +367,135 @@ bool parseS(char *s, char *e, char *cmd)
     return true;
 }
 
-/* TODO: Rewrite this to pipe properly */
+/*
+  Evaluate the argument
+  This just expands any user defined constants preceeded by a $
+*/
+char* evalArg(char *arg)
+{
+    int pos1 = 0;
+    int pos2 = strlen(arg);
+    int keyPos1 = INVALID_POS;
+    int keyPos2 = INVALID_POS;
+    int i = 0;
+    char key[BUFF_MAX] = "";
+    char *val = NULL;
+    char temp[BUFF_MAX] = "";
+    temp[0] = '\0';
+    while (pos1 < pos2)
+    {
+        while (i < pos2 && arg[i] != '$')
+            ++i;
+        if (i == pos2) /* No $ in arg */
+            break;
+        /* Else found a $ */
+        keyPos1 = keyPos2 = i + 1;
+        while (keyPos2 <= pos2 && isalpha(arg[keyPos2])) /* Read key until we hit a non-alpha character or end of string */
+            ++keyPos2;
+        if (keyPos2 - keyPos1 > BUFF_MAX - 1)
+        {
+            fprintf(stderr, "evalArg: key length exceeds BUFF_MAX\n");
+            return arg;
+        }
+        strncpy(key, arg + keyPos1, keyPos2 - keyPos1);
+        key[keyPos2 - keyPos1] = '\0';
+        val = getConst(key);
+        strncpy(temp + pos1, arg + pos1, i - pos1);
+        temp[i] = '\0';
+        strcat(temp, val);
+        pos1 = i = keyPos2;
+    }
+    if (pos1 < pos2)
+        strcat(temp, arg + pos1); /* Add the remainder of the arg */
+    strcpy(arg, temp);
+    return arg;
+}
+
+/* Evaluate the command and run the executable */
+int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
+{
+    /* TODO: Needs testing */
+    char path[BUFF_MAX]; /* String to store the current value of PATH */
+    char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
+    strcpy(path, consts[0][1]); /* Get the current PATH value */
+    char *tok = NULL;
+    bool isPath = false; /* Is the given command already a path to an executable */
+    for (unsigned int i = 0; i < strlen(cmd); ++i) /* Look for a '/' to signal that cmd is already a path */
+    {
+        if (cmd[i] == '/')
+        {
+            isPath = true;
+            break;
+        }
+    }
+    if (isPath)
+        strcpy(execPath, cmd);
+    else
+    {
+        tok = strtok(path, ":");
+        while (tok != NULL)
+        {
+            /* Generate possible executable path using value in PATH and cmd */
+            strcpy(execPath, tok);
+            strcat(execPath, "/");
+            strcat(execPath, cmd);
+            if (access(execPath, X_OK) != -1) /* Found an appropriate executable */
+                break;
+            tok = strtok(NULL, ":");
+        }
+    }
+    if (access(execPath, X_OK) != -1)
+    {
+        pid_t pid = fork();
+        if (pid == 0) /* Child process */
+        {
+            if (isBg)
+                setpgid(0,0); /* Put this child into a new process group */
+            execv(execPath, argv);
+            exit(127); /* If process fails */
+        }
+        else /* Parent process */
+        {
+            if (isBg)
+                return 0; /* Don't wait for child process and just return */
+            /* Else wait for process before returning */
+            pid_t r = waitpid(pid, 0, 0);
+            if (r == -1) /* An error occured */
+                return 1;
+            return 0;
+        }
+    }
+    fprintf(stderr, "\'%s\' is not a valid command\n", cmd);
+    return 1;
+}
+
+/* Evaluate the statement */
+int evalS(char *s)
+{
+    /* TODO: Test this */
+    unsigned int numArgs = 0;
+    char e[BUFF_MAX] = "";
+    char cmd[BUFF_MAX] = "";
+    char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
+    bool isBg = false;
+    bool ok = parseS(s, e, cmd);
+    if (!ok)
+        return 1;
+    if (strlen(cmd) == 0) /* Statement is a braced expression */
+        return evalExpr(e);
+    /* Else statement is a command */
+    parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
+    int r = evalCmd(cmd, numArgs, argv, isBg);
+    /* Clean up argv */
+    for (unsigned int i = 0; i < numArgs; ++i)
+        free(argv[i]);
+    free(argv);
+    return r;
+}
+
+/* TODO: Rewrite this */
 /* Evaluate the expression. Assume that there are no trailing whitespaces */
-int evalExpr(char *expr, int pos1, int pos2, char *inBuff, char *outBuff)
+int evalExpr(char *expr)
 {
     return 0; /* Placeholder */
     /* TODO: Rewrite this to support proper piping */
