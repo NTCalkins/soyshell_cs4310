@@ -3,10 +3,10 @@
   ('+' = whitespace)
   expr: s / s + op + expr
   s: {expr} / invoke
-  invoke: cmd [ + redir + cmd ]...
+  invoke: cmd [ + | + cmd ]...
   op: && / || / ; / =
-  redir: | / < / << / > / >>
-  cmd: EXECUTABLE [+ arg]... [ + &]
+  redir: < / << / > / >>
+  cmd: EXECUTABLE [+ arg]... [ + &] [+ redir + FILE_NAME/DELIM]
   arg: $NAMED_CONSTANT / LITERAL
 
   IMPORTANT: Don't forget to call init() to intialize the array of user
@@ -35,7 +35,7 @@ void finish();
 bool addConst(char*, char*);
 char* getConst(char*);
 bool isOp(char*);
-bool isRedir(char*);
+bool isPipe(char*);
 bool matchBrace(char*, int*, const unsigned int);
 bool matchQuote(char*, int*, const unsigned int);
 bool parseExpr(char*, char*, char*, char*);
@@ -159,35 +159,9 @@ bool isOp(char *s)
     }
 }
 
-/* Check if the string is a valid redirection operator */
-bool isRedir(char *s)
-{
-    if (strlen(s) > 2) /* No operators are more than 2 characters long */
-        return false;
-    if (strlen(s) == 1) /* Single character operator lets us use a switch statement */
-    {
-        switch (s[0])
-        {
-        case '|':
-        case '<':
-        case '>':
-            return true;
-        default:
-            return false;
-        }
-    }
-    else /* Compare the string to supported 2 character operators */
-    {
-        const unsigned int NUM_OPS = 2;
-        char *ops[NUM_OPS] = { "<<", ">>" }; /* All supported 2 character operators */
-        for (unsigned int i = 0; i < NUM_OPS; ++i)
-        {
-            if (strcmp(s, ops[i]) == 0)
-                return true;
-        }
-        return false;
-    }
-}
+/* Check if the string is a pipe */
+bool isPipe(char *s)
+{ return (s[0] == '|'); }
 
 bool containsOp(char *s)
 {
@@ -346,7 +320,7 @@ bool parseExpr(char *expr, char *s, char *op, char *e)
  isBg: Returns if a & was passed to indicate a background process
 */
 bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsigned int *numArgs, bool *isBg)
-{
+{ /* TODO: Update this in accordance with new grammar */
     int pos1 = 0;
     int pos2 = strlen(s) - 1;
     int tokPos1 = INVALID_POS;
@@ -475,7 +449,7 @@ bool parseS(char *s, char *e, char *cmd)
   numCmds: Int to store the number of parsed commands
   numRedirs: Int to store the number of parsed redirection operators
 */
-bool parseInvoke(char *s, char **cmds, char **redirs, unsigned int *numCmds, unsigned int *numRedirs)
+bool parseInvoke(char *s, char **cmds, unsigned int *numCmds, unsigned int *numPipes)
 {
     int pos1 = 0;
     int pos2 = strlen(s) - 1;
@@ -485,7 +459,6 @@ bool parseInvoke(char *s, char **cmds, char **redirs, unsigned int *numCmds, uns
     int i = 0;
     /* Initialize return values */
     *numCmds = 0;
-    *numRedirs = 0;
     if (strlen(s) == 0) /* Empty expression passed */
         return true;
     while (pos2 > pos1 && isspace(s[pos2])) /* Remove trailing whitespace */
@@ -505,7 +478,7 @@ bool parseInvoke(char *s, char **cmds, char **redirs, unsigned int *numCmds, uns
         tokPos2 = i;
         strncpy(token, s + tokPos1, tokPos2 - tokPos1);
         token[tokPos2 - tokPos1] = '\0';
-        if (isRedir(token)) /* Found a redirection operator */
+        if (isPipe(token)) /* Found a redirection operator */
         {
             i = tokPos1 - 1;
             if (i == -1)
@@ -520,10 +493,7 @@ bool parseInvoke(char *s, char **cmds, char **redirs, unsigned int *numCmds, uns
             strncpy(cmds[*numCmds], s + pos1, i - pos1 + 1);
             cmds[*numCmds][i - pos1 + 1] = '\0';
             ++(*numCmds);
-            /* Save the redirection operator */
-            redirs[*numRedirs] = (char*) malloc(BUFF_MAX * sizeof(char));
-            strcpy(redirs[*numRedirs], token);
-            ++(*numRedirs);
+            ++(*numPipes);
             pos1 = tokPos2;
             while (pos1 <= pos2 && isspace(s[pos1]))
                 ++pos1;
@@ -538,13 +508,13 @@ bool parseInvoke(char *s, char **cmds, char **redirs, unsigned int *numCmds, uns
     ++(*numCmds);
     /* Terminate with NULL */
     cmds[*numCmds] = NULL;
-    redirs[*numRedirs] = NULL;
     return true;
 }
 
 /* Evaluate the invocation */
 int evalInvoke(char *s)
 {
+    /* TODO: Implement this */
     return 0; /* Placeholder */
 }
 
@@ -594,8 +564,7 @@ char* evalArg(char *arg)
 
 /* Evaluate the command and run the executable */
 int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
-{
-    /* TODO: Needs testing */
+{ /* TODO: Update this in accordance with new grammar */
     char path[BUFF_MAX]; /* String to store the current value of PATH */
     char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
     strcpy(path, consts[0][1]); /* Get the current PATH value */
@@ -746,12 +715,11 @@ char *read_command(void)
 int main()
 {
     init();
-    char invoke[BUFF_MAX] = "test | testing test test > tester much test >> so test < please << work";
+    char invoke[BUFF_MAX] = "test < testing test test | tester much test >> so test | please << work";
     char *cmds[BUFF_MAX] = {};
-    char *redirs[BUFF_MAX] = {};
     unsigned int numCmds = 0;
-    unsigned int numRedirs = 0;
-    parseInvoke(invoke, cmds, redirs, &numCmds, &numRedirs);
+    unsigned int numPipes = 0;
+    parseInvoke(invoke, cmds, &numCmds, &numPipes);
     printf("Invocation parsed: %s\n", invoke);
     puts("Commands...");
     for (unsigned int i = 0; i < numCmds; ++i)
@@ -759,12 +727,7 @@ int main()
         puts(cmds[i]);
         free(cmds[i]);
     }
-    puts("Redirs...");
-    for (unsigned int i = 0; i < numRedirs; ++i)
-    {
-        puts(redirs[i]);
-        free(redirs[i]);
-    }
+    printf("Number of pipes: %d\n", numPipes);
     finish();
     return 0;
 }
