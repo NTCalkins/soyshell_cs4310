@@ -4,13 +4,13 @@
 int main(int argc, char **argv)
 {
     int status;
-    printf("%i",argc);
     if (argc != 2)
     {
-	    printf("No arguments given");
+	    puts("No arguments given");
 	    return 1;
     }
-    puts(argv[1]);
     status = mkdir(argv[1],0700);
+    if (status == -1)
+        return 1;
     return 0;
 }
