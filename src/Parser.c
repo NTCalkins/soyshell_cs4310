@@ -514,7 +514,34 @@ bool parseInvoke(char *s, char **cmds, unsigned int *numCmds, unsigned int *numP
 /* Evaluate the invocation */
 int evalInvoke(char *s)
 {
-    /* TODO: Implement this */
+    char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
+    char **redirs = (char**) malloc(MAX_ARGS * sizeof(char*));
+    unsigned int numCmds = 0;
+    unsigned int numRedirs = 0;
+    parseInvoke(s, cmds, redirs, &numCmds, &numRedirs);
+
+    char cmd[BUFF_MAX] = "";
+    char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
+    char **cmdRedirs = (char**) malloc(MAX_ARGS * sizeof(char*));
+    char **filenames = (char**) malloc(MAX_ARGS * sizeof(char*));
+    unsigned int numArgs = 0;
+    unsigned int numRedirsCmd = 0;
+    unsigned int numFilenames = 0;
+    bool isBg = false;
+
+    if (numCmds == 0)
+        return 0;
+    
+
+    for (i = 0; i < numCmds; i++) {
+        parseCmd(cmds[i],MAX_ARGS,cmd,argv,cmdRedirs,filenames,&numArgs,&numRedirs,&numFilenames,&isBg);
+
+    }
+    
+
+
+    //call ParseInvoke
+    //make a loop on the operators
     return 0; /* Placeholder */
 }
 
