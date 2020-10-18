@@ -8,11 +8,9 @@ int main (int argc, char **argv)
         return 0;
     }
     int r = rmdir(argv[1]);
-    if (r == 0) {
-        printf("%s removed\n", argv[1]);
-    }
-    else {
+    if (r == -1) {
         printf("%s could not be removed: either not empty or nonexistent\n", argv[1]);
+        return 1;
     }
     return 0;
 }
