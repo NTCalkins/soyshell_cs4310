@@ -385,7 +385,7 @@ bool parseS(char *s, char *e, char *cmd)
     cmd[0] = '\0';
     if (strlen(s) == 0) /* Empty expression passed */
         return false;
-    while (pos2 > pos1 && isspace(s[pos2]) || ) /* Remove trailing whitespace */
+    while (pos2 > pos1 && isspace(s[pos2])) /* Remove trailing whitespace */
         --pos2;
     while (pos1 <= pos2 && isspace(s[pos1])) /* Ignore leading whitespace */
         ++pos1;
@@ -742,7 +742,10 @@ int main() {
         getcwd(d, sizeof(d));
         printf("%s> ", d);
         command = read_command();
-        if (strcmp(command, "exit\n") == 0)
+        int len = strlen(command);
+        if (command[len-1] == '\n')
+            command[len-1] = 0;
+        if (strcmp(command, "exit") == 0)
             return 0;
         else {
             int r = evalS(command);
