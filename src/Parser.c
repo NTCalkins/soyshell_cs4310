@@ -532,17 +532,87 @@ int evalInvoke(char *s)
     if (numCmds == 0)
         return 0;
     
+    char outfile[BUFF_MAX] = "";
+    char infile[BUFF_MAX] = "";
+    int outfileIndex = -1;
+    int infileIndex = -1;
+    bool isAppend = false;
 
-    for (i = 0; i < numCmds; i++) {
-        parseCmd(cmds[i],MAX_ARGS,cmd,argv,cmdRedirs,filenames,&numArgs,&numRedirs,&numFilenames,&isBg);
+    char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
 
+    for (int i = 0; i < numCmds; i++) {
+        parseCmd(cmds[i],MAX_ARGS,cmd,argv,cmdRedirs,filenames,&numArgs,&numRedirsCmd,&numFilenames,&isBg);
+        if (getExecPath(cmds[i], execPath) != 0) {
+            continue;
+        }
+        outfileIndex = -1;
+        infileIndex = -1;
+        isAppend = false;
+        for (int j = 0; j < numRedirsCmd; j++) {
+            k = 0;
+            if (strcmp(cmdRedirs[j],">>")) {
+                outfileIndex = k;
+                isAppend = true;
+            }
+            else if (strcmp(cmdRedirs[j], ">")) {
+                outfileIndex = k;
+                isAppend = false;
+            }
+            else if (strcmp(cmdRedirs[j], "<")) {
+                infileIndex = k;
+            }
+            k++;
+        }
+        /*
+        By the end of the redir loop, we'll know where/if we're outputting, how (append or not),
+        and where we're getting arguments from/if we're getting arguments from file.
+        */
+        if (infileIndex != -1) {
+            //infile = filenames[infileIndex];
+        }
+        if (outfileIndex != -1) {
+            //outfile = filenames[outfileIndex];
+        }
+        //execRedir(execPath,argv,infile,outfile,isAppend);
     }
-    
-
-
-    //call ParseInvoke
-    //make a loop on the operators
     return 0; /* Placeholder */
+}
+
+int getExecPath(char *cmd, char *execPath)
+{
+    char path[BUFF_MAX]; /* String to store the current value of PATH */
+    strcpy(path, consts[0][1]); /* Get the current PATH value */
+    char *tok = NULL;
+    bool isPath = false; /* Is the given command already a path to an executable */
+    for (unsigned int i = 0; i < strlen(cmd); ++i) /* Look for a '/' to signal that cmd is already a path */
+    {
+        if (cmd[i] == '/')
+        {
+            isPath = true;
+            break;
+        }
+    }
+    if (isPath)
+        strcpy(execPath, cmd);
+    else
+    {
+        tok = strtok(path, ":");
+        while (tok != NULL)
+        {
+            /* Generate possible executable path using value in PATH and cmd */
+            strcpy(execPath, tok);
+            strcat(execPath, "/");
+            strcat(execPath, cmd);
+            if (access(execPath, X_OK) != -1) /* Found an appropriate executable */
+                break;
+            tok = strtok(NULL, ":");
+        }
+    }
+    if (access(execPath, X_OK) != -1)
+    {
+        return 0;
+    }
+    return 1;
 }
 
 /*
