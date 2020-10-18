@@ -158,6 +158,26 @@ bool isOp(char *s)
     }
 }
 
+bool containsOp(char *s)
+{
+    char substr[3];
+    for (int i = 0; i < strlen(s); i++) {
+        memcpy(substr,&s[0+i],1);
+        substr[1] = '\0';
+        if (isOp(substr)) {
+            return true;
+        }
+        if (strlen(s) - i >= 2) {
+            memcpy(substr,&s[0+i],2);
+            substr[2] = '\0';
+            if (isOp(substr)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /* Move pos to matching closing brace */
 bool matchBrace(char *s, int *pos, const unsigned int maxPos)
 {
@@ -389,6 +409,11 @@ bool parseS(char *s, char *e, char *cmd)
         --pos2;
     while (pos1 <= pos2 && isspace(s[pos1])) /* Ignore leading whitespace */
         ++pos1;
+    if (containsOp(s)) {
+        strncpy(e, s + pos1, pos2 - pos1 + 1);
+        s[pos2 - pos1 + 1] = '\0';
+        return true;
+    }
     if (s[pos1] == '{') /* Statement is an expression enclosed in braces */
     {
         if (s[pos2] != '}')
@@ -396,6 +421,7 @@ bool parseS(char *s, char *e, char *cmd)
             fprintf(stderr, "parseS: expression not properly enclosed in braces\n");
             return false;
         }
+        ++pos1;
         --pos2;
         while (pos2 > pos1 && isspace(s[pos2]))
             --pos2;
@@ -566,9 +592,10 @@ int evalExpr(char *expr)
     char op[BUFF_MAX];
     char right[BUFF_MAX];
     int l_code, r_code;
-    printf("Entering evalExpr");
     parseExpr(expr,left,op,right);
-    printf("%s\n%s\n%s", left, op, right);
+
+    
+
     if (strcmp(op, "&&") == 0)
     {
         l_code = evalS(left);
@@ -582,18 +609,31 @@ int evalExpr(char *expr)
             return 0;
         r_code = evalS(right);
     }
-    // else if (strcmp(op, "|") == 0)
-    // {
+    else if (strcmp(op, "<<") == 0)
+    {
+        
+    }
+    else if (strcmp(op, ">>") == 0)
+    {
 
-    // }
-    // else if (strcmp(op, ";") == 0)
-    // {
+    }
+    else if (strcmp(op, "<") == 0)
+    {
 
-    // }
-    // else if (strcmp(op, "<") == 0)
-    // {
+    }
+    else if (strcmp(op, ">") == 0)
+    {
 
-    // }
+    }
+    else if (strcmp(op, "|") == 0)
+    {
+
+    }
+    else if (strcmp(op, ";") == 0)
+    {
+
+    }
+    
     return 0;
 }
     
