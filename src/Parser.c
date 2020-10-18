@@ -675,25 +675,15 @@ int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
 /* Evaluate the statement */
 int evalS(char *s)
 {
-    /* TODO: Test this */
-    unsigned int numArgs = 0;
     char e[BUFF_MAX] = "";
     char cmd[BUFF_MAX] = "";
-    char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
-    bool isBg = false;
     bool ok = parseS(s, e, cmd);
     if (!ok)
         return 1;
     if (strlen(cmd) == 0) /* Statement is a braced expression */
         return evalExpr(e);
-    /* Else statement is a command */
-    parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
-    int r = evalCmd(cmd, numArgs, argv, isBg);
-    /* Clean up argv */
-    for (unsigned int i = 0; i < numArgs; ++i)
-        free(argv[i]);
-    free(argv);
-    return r;
+    /* Else statement is an invocation */
+    return evalInvoke(s);
 }
 
 /* Evaluate the expression. Assume that there are no trailing whitespaces */
