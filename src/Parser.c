@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <limits.h>
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
 #define INVALID_POS -1
 #define INIT_CONSTS 8 /* Initial number of constants to allocate memory for */
@@ -774,37 +775,54 @@ int evalExpr(char *expr)
 //     return 0;
 // }
 
-char *read_command(void) {
+char *read_command(void)
+{
     char *command = NULL;
     long unsigned n = 0;
-
-    if (getline(&command, &n, stdin) == -1) {
-        return command;
-    }
+    
+    if (getline(&command, &n, stdin) == -1)
+        return NULL;
     return command;
 }
 
-int main() {
-
+int main()
+{
     init();
-
-    char d[1024];
-    if (getcwd(d, sizeof(d)) != NULL) {
+    char d[PATH_MAX];
+    char user[BUFF_MAX];
+    unsigned int i = 0;
+    int lastResult;
+    if (getcwd(d, sizeof(d)) != NULL)
+    {
         //TODO: Account for some kind of invalid read of path
     }
     char *command;
-    while (1) {
+    getlogin_r(user, BUFF_MAX); /* Get name of current user */
+    while (1)
+    {
         getcwd(d, sizeof(d));
-        printf("%s> ", d);
+        /* Only print the last directory in the current path */
+        i = strlen(d);
+        while (i > 0 && d[i - 1] != '/')
+            --i;
+        printf("%s@soyshell %s> ", user, d + i);
         command = read_command();
+        if (command == NULL) /* Failed to read input */
+        {
+            fprintf(stderr, "Failed to read stdin\n");
+            continue;
+        }
         int len = strlen(command);
         if (command[len-1] == '\n')
             command[len-1] = 0;
         if (strcmp(command, "exit") == 0)
+        {
+            if (command != NULL)
+                free(command);
             return 0;
-        else {
-            int r = evalS(command);
         }
+        lastResult = evalS(command);
+        free(command);
     }
     finish();
     return 0;
