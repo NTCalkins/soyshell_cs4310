@@ -3,7 +3,7 @@
   ('+' = whitespace)
   expr: s / s + op + expr
   s: {expr} / cmd [... + arg] [ + &]
-  op: && / || / | / ; / < / << / > / >>
+  op: && / || / | / ; / < / << / > / >> / =
   cmd: All supported commands (ls, mv, etc.) / Assignment statement
   arg: $(expr) / $NAMED_CONSTANT / LITERAL / WILDCARD
 
@@ -263,7 +263,7 @@ bool parseExpr(char *expr, char *s, char *op, char *e)
         bool ok = matchBrace(expr, &i, pos2);
         if (!ok) /* Failed to match brace */
         {
-            fprintf(stderr, "parser: failed to match brace\n");
+            fprintf(stderr, "parseExpr: failed to match brace\n");
             return false;
         }
         ++i; /* Move past the matched brace */
@@ -592,46 +592,61 @@ int evalExpr(char *expr)
     char op[BUFF_MAX];
     char right[BUFF_MAX];
     int l_code, r_code;
+    if (strlen(expr) == 0) /* Empty expression */
+        return 0;
     parseExpr(expr,left,op,right);
-
-    
-
-    if (strcmp(op, "&&") == 0)
+    if (strlen(op) == 0) /* No operator, just a statement */
+        return evalS(expr);
+    if (strlen(right) == 0) /* No right expression found */
+    {
+        fprintf(stderr, "evalExpr: expected right hand expression for operator\n");
+        return 1;
+    }
+    if (strcmp(op, "&&") == 0) /* AND operator */
     {
         l_code = evalS(left);
         if (l_code == 0)
-            r_code = evalS(right);
+            r_code = evalExpr(right);
     }
-    else if (strcmp(op, "||") == 0)
+    else if (strcmp(op, "||") == 0) /* OR operator */
     {
         l_code = evalS(left);
         if (l_code == 0)
             return 0;
-        r_code = evalS(right);
+        return evalExpr(right);
     }
-    else if (strcmp(op, "<<") == 0)
+    else if (strcmp(op, ";") == 0) /* Evaluate sequentially */
+    {
+        evalS(left);
+        return evalExpr(right);
+    }
+    else if (strcmp(op, "<<") == 0) /* Read input until delim */
     {
         
     }
-    else if (strcmp(op, ">>") == 0)
+    else if (strcmp(op, ">>") == 0) /* Output redirection in append mode */
     {
 
     }
-    else if (strcmp(op, "<") == 0)
+    else if (strcmp(op, "<") == 0) /* Input redirection */
     {
 
     }
-    else if (strcmp(op, ">") == 0)
+    else if (strcmp(op, ">") == 0) /* Output redirection */
     {
 
     }
-    else if (strcmp(op, "|") == 0)
+    else if (strcmp(op, "|") == 0) /* Pipe operator */
     {
 
     }
-    else if (strcmp(op, ";") == 0)
+    else if (strcmp(op, "=") == 0) /* Assignment operator */
     {
-
+        /* Left is the key, right is the val */
+        bool ok = addConst(left, right);
+        if (!ok)
+            return 1;
+        return 0;
     }
     
     return 0;
