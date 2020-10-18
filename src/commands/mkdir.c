@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 	    printf("No arguments given");
 	    return 1;
     }
-    printf(argv[1]);
+    puts(argv[1]);
     status = mkdir(argv[1],0700);
     return 0;
 }
