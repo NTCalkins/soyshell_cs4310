@@ -8,7 +8,7 @@ int main(int argc, char **argv)
     if (argc != 2)
     {
 	    printf("No arguments given");
-	    return 0;
+	    return 1;
     }
     printf(argv[1]);
     status = mkdir(argv[1],0700);

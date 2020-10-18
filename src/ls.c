@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
 
 	if (d == NULL) {
 		printf("directory cannot be read.\n");
-		return 0;
+		return 1;
 	}
         dir = readdir(d);
 	while (dir != NULL) {

@@ -5,14 +5,14 @@ int main (int argc, char** argv) {
 	
 	if (argc < 3) {
 		printf("Not enough arguments\n");
-		return 0;
+		return 1;
 	}
 
 	FILE *fp_source = fopen(argv[1], "r");
 
 	if (!fp_source) {
 		printf("No file %s exists\n",argv[1]);
-		return 0;
+		return 1;
 	}
 	
 	//We're copying over this file anyways, clean opening
@@ -27,5 +27,5 @@ int main (int argc, char** argv) {
 	fclose(fp_source);
 	fclose(fp_dest);
 	
-	return 1;
+	return 0;
 }

@@ -385,7 +385,7 @@ bool parseS(char *s, char *e, char *cmd)
     cmd[0] = '\0';
     if (strlen(s) == 0) /* Empty expression passed */
         return false;
-    while (pos2 > pos1 && isspace(s[pos2])) /* Remove trailing whitespace */
+    while (pos2 > pos1 && isspace(s[pos2]) || ) /* Remove trailing whitespace */
         --pos2;
     while (pos1 <= pos2 && isspace(s[pos1])) /* Ignore leading whitespace */
         ++pos1;
@@ -464,9 +464,11 @@ int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
     char *tok = NULL;
     bool isPath = false; /* Is the given command already a path to an executable */
     char *ptr = argv[0];
+    int retVal = 0;
     if (*ptr == 'c' && *(++ptr) == 'd') {
         if (argc != 2) {
             printf("Only one argument allowed\n");
+            return 1;
         }
         int r = chdir(argv[1]);
         if (r == 0) {
@@ -510,6 +512,11 @@ int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
             if (isBg)
                 setpgid(0,0); /* Put this child into a new process group */
             execv(execPath, argv);
+            if (!isBg) {
+                int waitstatus;
+                wait(&waitstatus);
+                retVal = WEXITSTATUS(waitstatus);
+            }
             exit(127); /* If process fails */
         }
         else /* Parent process */
@@ -520,7 +527,7 @@ int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
             pid_t r = waitpid(pid, 0, 0);
             if (r == -1) /* An error occured */
                 return 1;
-            return 0;
+            return retVal;
         }
     }
     fprintf(stderr, "\'%s\' is not a valid command\n", cmd);
@@ -555,7 +562,43 @@ int evalS(char *s)
 /* Evaluate the expression. Assume that there are no trailing whitespaces */
 int evalExpr(char *expr)
 {
-    return 0; /* Placeholder */
+    char left[BUFF_MAX];
+    char op[BUFF_MAX];
+    char right[BUFF_MAX];
+    int l_code, r_code;
+    printf("Entering evalExpr");
+    parseExpr(expr,left,op,right);
+    printf("%s\n%s\n%s", left, op, right);
+    if (strcmp(op, "&&") == 0)
+    {
+        l_code = evalS(left);
+        if (l_code == 0)
+            r_code = evalS(right);
+    }
+    else if (strcmp(op, "||") == 0)
+    {
+        l_code = evalS(left);
+        if (l_code == 0)
+            return 0;
+        r_code = evalS(right);
+    }
+    // else if (strcmp(op, "|") == 0)
+    // {
+
+    // }
+    // else if (strcmp(op, ";") == 0)
+    // {
+
+    // }
+    // else if (strcmp(op, "<") == 0)
+    // {
+
+    // }
+    return 0;
+}
+    
+    
+    /* Placeholder */
     /* TODO: Rewrite this to support proper piping */
     /* if (strcmp(op, "&&") == 0) /\* Logical AND *\/ */
     /* { */
@@ -652,7 +695,6 @@ int evalExpr(char *expr)
     /* /\* Execution should never reach here *\/ */
     /* fprintf(stderr, "evalExpr: tried to evaluate invalid operator\n"); */
     /* return FATAL_ERR; */
-}
 
 /* Test driver */
 // int main()
