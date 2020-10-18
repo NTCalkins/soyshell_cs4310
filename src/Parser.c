@@ -2,10 +2,12 @@
   Parser for the shell designed to parse the following grammar
   ('+' = whitespace)
   expr: s / s + op + expr
-  s: {expr} / cmd [... + arg] [ + &]
-  op: && / || / | / ; / < / << / > / >> / =
-  cmd: All supported commands (ls, mv, etc.) / Assignment statement
-  arg: $(expr) / $NAMED_CONSTANT / LITERAL / WILDCARD
+  s: {expr} / invoke
+  invoke: cmd [ + redir + cmd ]...
+  op: && / || / ; / =
+  redir: | / < / << / > / >>
+  cmd: EXECUTABLE [+ arg]... [ + &]
+  arg: $NAMED_CONSTANT / LITERAL
 
   IMPORTANT: Don't forget to call init() to intialize the array of user
   defined constants and finish() to cleanup the array
@@ -33,6 +35,7 @@ void finish();
 bool addConst(char*, char*);
 char* getConst(char*);
 bool isOp(char*);
+bool isRedir(char*);
 bool matchBrace(char*, int*, const unsigned int);
 bool matchQuote(char*, int*, const unsigned int);
 bool parseExpr(char*, char*, char*, char*);
@@ -137,8 +140,35 @@ bool isOp(char *s)
     {
         switch (s[0])
         {
-        case '|':
         case ';':
+            return true;
+        default:
+            return false;
+        }
+    }
+    else /* Compare the string to supported 2 character operators */
+    {
+        const unsigned int NUM_OPS = 2;
+        char *ops[NUM_OPS] = { "&&", "||" }; /* All supported 2 character operators */
+        for (unsigned int i = 0; i < NUM_OPS; ++i)
+        {
+            if (strcmp(s, ops[i]) == 0)
+                return true;
+        }
+        return false;
+    }
+}
+
+/* Check if the string is a valid redirection operator */
+bool isRedir(char *s)
+{
+    if (strlen(s) > 2) /* No operators are more than 2 characters long */
+        return false;
+    if (strlen(s) == 1) /* Single character operator lets us use a switch statement */
+    {
+        switch (s[0])
+        {
+        case '|':
         case '<':
         case '>':
             return true;
@@ -148,8 +178,8 @@ bool isOp(char *s)
     }
     else /* Compare the string to supported 2 character operators */
     {
-        const unsigned int NUM_OPS = 4;
-        char *ops[NUM_OPS] = { "&&", "||", "<<", ">>" }; /* All supported 2 character operators */
+        const unsigned int NUM_OPS = 2;
+        char *ops[NUM_OPS] = { "<<", ">>" }; /* All supported 2 character operators */
         for (unsigned int i = 0; i < NUM_OPS; ++i)
         {
             if (strcmp(s, ops[i]) == 0)
@@ -438,6 +468,87 @@ bool parseS(char *s, char *e, char *cmd)
 }
 
 /*
+  Parse an invocation consisting of a series of commands and redirections
+  s: String to be parsed
+  cmds: Array of unallocated char pointers to store the parsed commands
+  redirs: Array of unallocated char pointers to store the parsed redirection operators
+  numCmds: Int to store the number of parsed commands
+  numRedirs: Int to store the number of parsed redirection operators
+*/
+bool parseInvoke(char *s, char **cmds, char **redirs, unsigned int *numCmds, unsigned int *numRedirs)
+{
+    int pos1 = 0;
+    int pos2 = strlen(s) - 1;
+    int tokPos1 = INVALID_POS;
+    int tokPos2 = INVALID_POS;
+    char token[BUFF_MAX] = {};
+    int i = 0;
+    /* Initialize return values */
+    *numCmds = 0;
+    *numRedirs = 0;
+    if (strlen(s) == 0) /* Empty expression passed */
+        return true;
+    while (pos2 > pos1 && isspace(s[pos2])) /* Remove trailing whitespace */
+        --pos2;
+    while (pos1 <= pos2 && isspace(s[pos1])) /* Ignore leading whitespace */
+        ++pos1;
+    if (pos1 > pos2) /* Expression consisted of all white space */
+        return true; /* Do nothing */
+    i = pos1;
+    while (i <= pos2)
+    {
+        while (i <= pos2 && isspace(s[i]))
+            ++i;
+        tokPos1 = i;
+        while (i <= pos2 && !isspace(s[i]))
+            ++i;
+        tokPos2 = i;
+        strncpy(token, s + tokPos1, tokPos2 - tokPos1);
+        token[tokPos2 - tokPos1] = '\0';
+        if (isRedir(token)) /* Found a redirection operator */
+        {
+            i = tokPos1 - 1;
+            if (i == -1)
+            {
+                fprintf(stderr, "parseInvoke: expected left command for redirection operator\n");
+                return false;
+            }
+            while (i > 0 && isspace(s[i]))
+                --i;
+            /* Save the command */
+            cmds[*numCmds] = (char*) malloc(BUFF_MAX * sizeof(char));
+            strncpy(cmds[*numCmds], s + pos1, i - pos1 + 1);
+            cmds[*numCmds][i - pos1 + 1] = '\0';
+            ++(*numCmds);
+            /* Save the redirection operator */
+            redirs[*numRedirs] = (char*) malloc(BUFF_MAX * sizeof(char));
+            strcpy(redirs[*numRedirs], token);
+            ++(*numRedirs);
+            pos1 = tokPos2;
+            while (pos1 <= pos2 && isspace(s[pos1]))
+                ++pos1;
+        }
+        i = tokPos2;
+        while (i <= pos2 && isspace(s[i]))
+            ++i;
+    }
+    /* Add the remaining cmd */
+    cmds[*numCmds] = (char*) malloc(BUFF_MAX * sizeof(char));
+    strcpy(cmds[*numCmds], s + pos1);
+    ++(*numCmds);
+    /* Terminate with NULL */
+    cmds[*numCmds] = NULL;
+    redirs[*numRedirs] = NULL;
+    return true;
+}
+
+/* Evaluate the invocation */
+int evalInvoke(char *s)
+{
+    return 0; /* Placeholder */
+}
+
+/*
   Evaluate the argument
   This just expands any user defined constants preceeded by a $
 */
@@ -585,7 +696,6 @@ int evalS(char *s)
     return r;
 }
 
-/* TODO: Rewrite this */
 /* Evaluate the expression. Assume that there are no trailing whitespaces */
 int evalExpr(char *expr)
 {
@@ -621,26 +731,6 @@ int evalExpr(char *expr)
         evalS(left);
         return evalExpr(right);
     }
-    else if (strcmp(op, "<<") == 0) /* Read input until delim */
-    {
-        
-    }
-    else if (strcmp(op, ">>") == 0) /* Output redirection in append mode */
-    {
-
-    }
-    else if (strcmp(op, "<") == 0) /* Input redirection */
-    {
-
-    }
-    else if (strcmp(op, ">") == 0) /* Output redirection */
-    {
-
-    }
-    else if (strcmp(op, "|") == 0) /* Pipe operator */
-    {
-
-    }
     else if (strcmp(op, "=") == 0) /* Assignment operator */
     {
         /* Left is the key, right is the val */
@@ -649,131 +739,8 @@ int evalExpr(char *expr)
             return 1;
         return 0;
     }
-    
     return 0;
 }
-    
-    
-    /* Placeholder */
-    /* TODO: Rewrite this to support proper piping */
-    /* if (strcmp(op, "&&") == 0) /\* Logical AND *\/ */
-    /* { */
-    /*     r = evalS(expr, pos1, sEnd, inBuff, outBuff); */
-    /*     if (r == FATAL_ERR) /\* Propogate fatal errors *\/ */
-    /*         return FATAL_ERR; */
-    /*     if (r == 0) /\* Left hand statement succeeded *\/ */
-    /*         return evalExpr(expr, expStart, pos2, inBuff, outBuff); /\* Evaluate right hand expression *\/ */
-    /*     else /\* Return false if first statement fails *\/ */
-    /*         return 1; */
-    /* } */
-    /* else if (strcmp(op, "||") == 0) /\* Logical OR *\/ */
-    /* { */
-    /*     r = evalS(expr, pos1, sEnd, inBuff, outBuff); */
-    /*     if (r == FATAL_ERR) */
-    /*         return FATAL_ERR; */
-    /*     if (r == 1) /\* Left hand statement failed *\/ */
-    /*         return evalExpr(expr, expStart, pos2, inBuff, outBuff); */
-    /*     else /\* Return true if first statement succeeds *\/ */
-    /*         return 0; */
-    /* } */
-    /* else if (strcmp(op, "|") == 0) /\* Pipe *\/ */
-    /* { */
-    /*     char pipeBuff[BUFF_MAX] = ""; /\* Intermediate buffer to do the piping *\/ */
-    /*     r = evalS(expr, pos1, sEnd, inBuff, pipeBuff); */
-    /*     if (r == FATAL_ERR) */
-    /*         return FATAL_ERR; */
-    /*     return evalExpr(expr, expStart, pos2, pipeBuff, outBuff); */
-    /* } */
-    /* else if (strcmp(op, ";") == 0) /\* Evaluate sequentually. Idk if this should be treated as an operator tbh *\/ */
-    /* { */
-    /*     r = evalS(expr, pos1, sEnd, inBuff, outBuff); */
-    /*     if (r == FATAL_ERR) */
-    /*         return FATAL_ERR; */
-    /*     return evalExpr(expr, expStart, pos2, inBuff, outBuff); */
-    /* } */
-    /* else if (strcmp(op, "<") == 0) /\* Input redirection *\/ */
-    /* { */
-    /*     /\* Right hand expression is a file name *\/ */
-    /*     char fileName[BUFF_MAX] = {}; */
-    /*     strncpy(fileName, expr + expStart, pos2 - expStart + 1); */
-    /*     FILE *inFile = fopen(fileName, "r"); */
-    /*     if (inFile == NULL) /\* Could not open file *\/ */
-    /*     { */
-    /*         fprintf(stderr, "Could not open file \'%s\'\n", fileName); */
-    /*         return FATAL_ERR; */
-    /*     } */
-    /*     /\* Get the file size *\/ */
-    /*     fseek(inFile, 0, SEEK_END); */
-    /*     long fSize = ftell(inFile); */
-    /*     rewind(inFile); */
-    /*     char *newIn = (char*)malloc(sizeof(char) * fSize); /\* New input buffer that contains the contents of the file *\/ */
-    /*     long readSize = fread(newIn, 1, fSize, inFile); /\* Read in contents of file into buffer *\/ */
-    /*     if (readSize != fSize) */
-    /*     { */
-    /*         fprintf(stderr, "Could not read contents of file \'%s\'\n", fileName); */
-    /*         return FATAL_ERR; */
-    /*     } */
-    /*     fclose(inFile); */
-    /*     r = evalS(expr, pos1, sEnd, newIn, outBuff); */
-    /*     free(newIn); */
-    /*     return r; */
-    /* } */
-    /* else if (strcmp(op, "<<") == 0) /\* Here document *\/ */
-    /* { */
-    /*     char delim[BUFF_MAX] = {}; /\* Delimiter string signaling end of input *\/ */
-    /*     char buffer[BUFF_MAX] = {}; */
-    /*     char input[BUFF_MAX] = {}; */
-    /*     strncpy(delim, expr + expStart, pos2 - expStart + 1); */
-    /*     fgets(input, BUFF_MAX, stdin); */
-    /*     while (strcmp(input, delim) != 0) /\* While we have not encountered the delim string *\/ */
-    /*     { */
-    /*         strcat(buffer, input); /\* Cat input into buffer *\/ */
-    /*         fgets(input, BUFF_MAX, stdin); */
-    /*     } */
-    /*     return evalS(expr, pos1, sEnd, buffer, outBuff); */
-    /* } */
-    /* else if (strcmp(op, ">") == 0 || strcmp(op, ">>") == 0) /\* Output redirection *\/ */
-    /* { */
-    /*     char fileName[BUFF_MAX] = ""; */
-    /*     strncpy(fileName, expr + expStart, pos2 - expStart + 1); */
-    /*     char newOut[BUFF_MAX] = {}; */
-    /*     r = evalS(expr, pos1, sEnd, inBuff, newOut); */
-    /*     FILE *outFile = (strlen(op) == 1) ? fopen(fileName, "w") : fopen(fileName, "a"); */
-    /*     if (outFile == NULL) */
-    /*     { */
-    /*         fprintf(stderr, "Could not open file \'%s\'", fileName); */
-    /*         return FATAL_ERR; */
-    /*     } */
-    /*     fwrite(newOut, sizeof(char), sizeof(newOut), outFile); */
-    /*     fclose(outFile); */
-    /*     return r; */
-    /* } */
-    /* /\* Execution should never reach here *\/ */
-    /* fprintf(stderr, "evalExpr: tried to evaluate invalid operator\n"); */
-    /* return FATAL_ERR; */
-
-/* Test driver */
-// int main()
-// {
-//     init();
-//     char s[BUFF_MAX] = "cd \"nice and\" \"quoted arguments\" please work &";
-//     char cmd[BUFF_MAX] = "";
-//     unsigned int numArgs;
-//     bool isBg;
-//     char *argv[MAX_ARGS] = {};
-//     parseCmd(s, MAX_ARGS, cmd, argv, &numArgs, &isBg);
-//     printf("Command parsed: %s\n", s);
-//     printf("Number of arguments: %d\n", numArgs);
-//     printf("Background: %d\n", isBg);
-//     printf("Arguments...\n");
-//     for (unsigned int i = 0; i < numArgs; ++i)
-//     {
-//         puts(argv[i]);
-//         free(argv[i]);
-//     }
-//     finish();
-//     return 0;
-// }
 
 char *read_command(void)
 {
@@ -785,45 +752,74 @@ char *read_command(void)
     return command;
 }
 
+/* Test driver */
 int main()
 {
     init();
-    char d[PATH_MAX];
-    char user[BUFF_MAX];
-    unsigned int i = 0;
-    int lastResult;
-    if (getcwd(d, sizeof(d)) != NULL)
+    char invoke[BUFF_MAX] = "test | testing test test > tester much test >> so test < please << work";
+    char *cmds[BUFF_MAX] = {};
+    char *redirs[BUFF_MAX] = {};
+    unsigned int numCmds = 0;
+    unsigned int numRedirs = 0;
+    parseInvoke(invoke, cmds, redirs, &numCmds, &numRedirs);
+    printf("Invocation parsed: %s\n", invoke);
+    puts("Commands...");
+    for (unsigned int i = 0; i < numCmds; ++i)
     {
-        //TODO: Account for some kind of invalid read of path
+        puts(cmds[i]);
+        free(cmds[i]);
     }
-    char *command;
-    getlogin_r(user, BUFF_MAX); /* Get name of current user */
-    while (1)
+    puts("Redirs...");
+    for (unsigned int i = 0; i < numRedirs; ++i)
     {
-        getcwd(d, sizeof(d));
-        /* Only print the last directory in the current path */
-        i = strlen(d);
-        while (i > 0 && d[i - 1] != '/')
-            --i;
-        printf("%s@soyshell %s> ", user, d + i);
-        command = read_command();
-        if (command == NULL) /* Failed to read input */
-        {
-            fprintf(stderr, "Failed to read stdin\n");
-            continue;
-        }
-        int len = strlen(command);
-        if (command[len-1] == '\n')
-            command[len-1] = 0;
-        if (strcmp(command, "exit") == 0)
-        {
-            if (command != NULL)
-                free(command);
-            return 0;
-        }
-        lastResult = evalS(command);
-        free(command);
+        puts(redirs[i]);
+        free(redirs[i]);
     }
     finish();
     return 0;
 }
+
+
+
+/* int main() */
+/* { */
+/*     init(); */
+/*     char d[PATH_MAX]; */
+/*     char user[BUFF_MAX]; */
+/*     unsigned int i = 0; */
+/*     int lastResult; */
+/*     if (getcwd(d, sizeof(d)) != NULL) */
+/*     { */
+/*         //TODO: Account for some kind of invalid read of path */
+/*     } */
+/*     char *command; */
+/*     getlogin_r(user, BUFF_MAX); /\* Get name of current user *\/ */
+/*     while (1) */
+/*     { */
+/*         getcwd(d, sizeof(d)); */
+/*         /\* Only print the last directory in the current path *\/ */
+/*         i = strlen(d); */
+/*         while (i > 0 && d[i - 1] != '/') */
+/*             --i; */
+/*         printf("%s@soyshell %s> ", user, d + i); */
+/*         command = read_command(); */
+/*         if (command == NULL) /\* Failed to read input *\/ */
+/*         { */
+/*             fprintf(stderr, "Failed to read stdin\n"); */
+/*             continue; */
+/*         } */
+/*         int len = strlen(command); */
+/*         if (command[len-1] == '\n') */
+/*             command[len-1] = 0; */
+/*         if (strcmp(command, "exit") == 0) */
+/*         { */
+/*             if (command != NULL) */
+/*                 free(command); */
+/*             return 0; */
+/*         } */
+/*         lastResult = evalS(command); */
+/*         free(command); */
+/*     } */
+/*     finish(); */
+/*     return 0; */
+/* } */
