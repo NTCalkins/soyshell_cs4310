@@ -5,7 +5,7 @@
   s: {expr} / invoke
   invoke: cmd [ + | + cmd ]...
   op: && / || / ; / =
-  redir: < / << / > / >>
+  redir: < / > / >>
   cmd: EXECUTABLE [+ arg]... [ + &] [+ redir + FILE_NAME/DELIM]
   arg: $NAMED_CONSTANT / LITERAL
 
@@ -36,10 +36,11 @@ bool addConst(char*, char*);
 char* getConst(char*);
 bool isOp(char*);
 bool isPipe(char*);
+bool isRedir(char*);
 bool matchBrace(char*, int*, const unsigned int);
 bool matchQuote(char*, int*, const unsigned int);
 bool parseExpr(char*, char*, char*, char*);
-bool parseCmd(char*, const unsigned int, char*, char**, unsigned int*, bool*);
+bool parseCmd(char*, const unsigned int, char*, char**, char**, char**, unsigned int*, unsigned int*, unsigned int*, bool*);
 bool parseS(char*, char*, char*);
 char* evalArg(char*);
 int evalCmd(char*, unsigned int, char**, bool);
@@ -162,6 +163,26 @@ bool isOp(char *s)
 /* Check if the string is a pipe */
 bool isPipe(char *s)
 { return (s[0] == '|'); }
+
+/* Check if the string is a redirection operator */
+bool isRedir(char *s)
+{
+    
+    if (strlen(s) == 1)
+    {
+        switch (s[0])
+        {
+        case '<':
+        case '>':
+            return true;
+        default:
+            return false;
+        }
+    }
+    if (strcmp(s, ">>") == 0)
+        return true;
+    return false;
+}
 
 bool containsOp(char *s)
 {
@@ -319,16 +340,18 @@ bool parseExpr(char *expr, char *s, char *op, char *e)
  numArgs: Returns the number of arguments extracted
  isBg: Returns if a & was passed to indicate a background process
 */
-bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsigned int *numArgs, bool *isBg)
-{ /* TODO: Update this in accordance with new grammar */
+bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, char **redirs, char **filenames, unsigned int *numArgs, unsigned int *numRedirs, unsigned int *numFilenames,  bool *isBg)
+{
     int pos1 = 0;
     int pos2 = strlen(s) - 1;
     int tokPos1 = INVALID_POS;
     int tokPos2 = INVALID_POS;
-    unsigned int i = 0;
+    char token[BUFF_MAX] = "";
     /* Initialize return values */
     cmd[0] = '\0';
     *numArgs = 0;
+    *numRedirs = 0;
+    *numFilenames = 0;
     *isBg = false;
     if (strlen(s) == 0) /* Empty expression passed */
         return true;
@@ -353,12 +376,13 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsig
     strncpy(cmd, s + tokPos1, tokPos2 - tokPos1);
     cmd[tokPos2 - tokPos1] = '\0';
     /* First element of argv is always the name of the command */
-    argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
-    strcpy(argv[i], cmd);
-    ++i;
-    while (i < maxArgs - 1 && tokPos2 < pos2)
+    argv[*numArgs] = (char*) malloc(BUFF_MAX * sizeof(char));
+    strcpy(argv[*numArgs], cmd);
+    ++(*numArgs);
+    /* Parse the argument list */
+    while (*numArgs < maxArgs - 1 && tokPos2 <= pos2)
     {
-        while (tokPos2 < pos2 && isspace(s[tokPos2]))
+        while (tokPos2 <= pos2 && isspace(s[tokPos2]))
             ++tokPos2;
         tokPos1 = tokPos2;
         if (s[tokPos1] == '\"') /* Quoted argument */
@@ -368,29 +392,73 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, unsig
             {
                 fprintf(stderr, "parseCmd: could not parse all arguments\n");
                 /* Terminate argv early */
-                argv[i] = NULL;
-                *numArgs = i;
+                argv[*numArgs] = NULL;
                 return false;
             }
-            argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
+            argv[*numArgs] = (char*) malloc(BUFF_MAX * sizeof(char));
             /* Take away the quotes and copy into argv */
-            strncpy(argv[i], s + tokPos1 + 1, tokPos2 - tokPos1 - 1);
-            argv[i][tokPos2 - tokPos1 - 1] = '\0';
+            strncpy(argv[*numArgs], s + tokPos1 + 1, tokPos2 - tokPos1 - 1);
+            argv[*numArgs][tokPos2 - tokPos1 - 1] = '\0';
             ++tokPos2; /* Move past end quote */
         }
         else
         {
             while (tokPos2 <= pos2 && !isspace(s[tokPos2]))
                 ++tokPos2;
-            argv[i] = (char*) malloc(BUFF_MAX * sizeof(char));
-            strncpy(argv[i], s + tokPos1, tokPos2 - tokPos1);
-            argv[i][tokPos2 - tokPos1] = '\0';
-            evalArg(argv[i]); /* Expand any user defined constants in the arg */
+            strncpy(token, s + tokPos1, tokPos2 - tokPos1);
+            token[tokPos2 - tokPos1] = '\0';
+            if (isRedir(token)) /* Hit the end of argument list and encountered a redirection operator */
+            {
+                redirs[*numRedirs] = (char*) malloc(BUFF_MAX * sizeof(char));
+                strcpy(redirs[*numRedirs], token);
+                ++(*numRedirs);
+                break;
+            }
+            argv[*numArgs] = (char*) malloc(BUFF_MAX * sizeof(char));
+            strcpy(argv[*numArgs], token);
+            evalArg(argv[*numArgs]); /* Expand any user defined constants in the arg */
+            ++(*numArgs);
         }
-        ++i;
     }
-    argv[i] = NULL; /* Terminate list of args with NULL */
-    *numArgs = i;
+    argv[*numArgs] = NULL; /* Terminate list of args with NULL */
+    if (*numRedirs > 0) /* Command has redirection arguments */
+    {
+        unsigned int itr = 0; /* Track the number of iterations */
+        /* Parse the filenames and redirection */
+        while (*numRedirs < maxArgs && *numFilenames < maxArgs && tokPos2 <= pos2)
+        {
+            while (tokPos2 <= pos2 && isspace(s[tokPos2]))
+                ++tokPos2;
+            tokPos1 = tokPos2;
+            while (tokPos2 <= pos2 && !isspace(s[tokPos2]))
+                ++tokPos2;
+            strncpy(token, s + tokPos1, tokPos2 - tokPos1);
+            token[tokPos2 - tokPos1] = '\0';
+            if (itr % 2 == 0 && isRedir(token)) /* Expect filenames on even iterations */
+            {
+                fprintf(stderr, "parseCmd: expected filename near \'%s\'\n", token);
+                return false;
+            }
+            if (itr % 2 == 1 && !isRedir(token)) /* Expect redirection operator on odd iterations */
+            {
+                fprintf(stderr, "parseCmd: expected redirection operator near \'%s\'\n", token);
+                return false;
+            }
+            if (itr % 2 == 0) /* Even iteration */
+            {
+                filenames[*numFilenames] = (char*) malloc(BUFF_MAX * sizeof(char));
+                strcpy(filenames[*numFilenames], token);
+                ++(*numFilenames);
+            }
+            else
+            {
+                redirs[*numRedirs] = (char*) malloc(BUFF_MAX * sizeof(char));
+                strcpy(redirs[*numRedirs], token);
+                ++(*numRedirs);
+            }
+            ++itr;
+        }
+    }
     return true;
 }
 
@@ -849,19 +917,40 @@ char *read_command(void)
 int main()
 {
     init();
-    char invoke[BUFF_MAX] = "test < testing test test | tester much test >> so test | please << work";
-    char *cmds[BUFF_MAX] = {};
-    unsigned int numCmds = 0;
-    unsigned int numPipes = 0;
-    parseInvoke(invoke, cmds, &numCmds, &numPipes);
-    printf("Invocation parsed: %s\n", invoke);
-    puts("Commands...");
-    for (unsigned int i = 0; i < numCmds; ++i)
+    char s[BUFF_MAX] = "testing test test >> foo < bar < bar > foo &";
+    char cmd[BUFF_MAX];
+    char *argv[BUFF_MAX];
+    char *redirs[BUFF_MAX];
+    char *filenames[BUFF_MAX];
+    unsigned int numArgs;
+    unsigned int numRedirs;
+    unsigned int numFilenames;
+    bool isBg;
+    bool ok = parseCmd(s, MAX_ARGS, cmd, argv, redirs, filenames, &numArgs, &numRedirs, &numFilenames, &isBg);
+    printf("Command parsed: %s\n", s);
+    if (ok)
     {
-        puts(cmds[i]);
-        free(cmds[i]);
+        printf("Command name: %s\n", cmd);
+        printf("Background: %d\n", isBg);
+        puts("Args...");
+        for (unsigned int i = 0; i < numArgs; ++i)
+        {
+            puts(argv[i]);
+            free(argv[i]);
+        }
+        puts("Redirs...");
+        for (unsigned int i = 0; i < numRedirs; ++i)
+        {
+            puts(redirs[i]);
+            free(redirs[i]);
+        }
+        puts("Filenames...");
+        for (unsigned int i = 0; i < numFilenames; ++i)
+        {
+            puts(filenames[i]);
+            free(filenames[i]);
+        }
     }
-    printf("Number of pipes: %d\n", numPipes);
     finish();
     return 0;
 }
