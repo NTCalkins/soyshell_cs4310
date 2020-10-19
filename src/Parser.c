@@ -580,8 +580,7 @@ bool parseInvoke(char *s, char **cmds, unsigned int *numCmds, unsigned int *numP
 
 int execRedir(char *execPath, char **argv, unsigned int arg, char* infile, char* outfile, bool isAppend) {
     pid_t pid = fork();
-    FILE *ifptr;
-    FILE *ofptr;
+    
     if (pid == 0) /* Child process */
     {
         /* For if there is an outfile in the first place */
