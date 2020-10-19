@@ -511,73 +511,111 @@ bool parseInvoke(char *s, char **cmds, unsigned int *numCmds, unsigned int *numP
     return true;
 }
 
-/* Evaluate the invocation */
-int evalInvoke(char *s)
-{
-    char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
-    char **redirs = (char**) malloc(MAX_ARGS * sizeof(char*));
-    unsigned int numCmds = 0;
-    unsigned int numRedirs = 0;
-    parseInvoke(s, cmds, redirs, &numCmds, &numRedirs);
+// /* Evaluate the invocation */
+// int evalInvoke(char *s)
+// {
+//     char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
+//     char **redirs = (char**) malloc(MAX_ARGS * sizeof(char*));
+//     unsigned int numCmds = 0;
+//     unsigned int numRedirs = 0;
+//     parseInvoke(s, cmds, redirs, &numCmds, &numRedirs);
 
-    char cmd[BUFF_MAX] = "";
-    char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
-    char **cmdRedirs = (char**) malloc(MAX_ARGS * sizeof(char*));
-    char **filenames = (char**) malloc(MAX_ARGS * sizeof(char*));
-    unsigned int numArgs = 0;
-    unsigned int numRedirsCmd = 0;
-    unsigned int numFilenames = 0;
-    bool isBg = false;
+//     char cmd[BUFF_MAX] = "";
+//     char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
+//     char **cmdRedirs = (char**) malloc(MAX_ARGS * sizeof(char*));
+//     char **filenames = (char**) malloc(MAX_ARGS * sizeof(char*));
+//     unsigned int numArgs = 0;
+//     unsigned int numRedirsCmd = 0;
+//     unsigned int numFilenames = 0;
+//     bool isBg = false;
 
-    if (numCmds == 0)
-        return 0;
+//     if (numCmds == 0)
+//         return 0;
     
-    char outfile[BUFF_MAX] = "";
-    char infile[BUFF_MAX] = "";
-    int outfileIndex = -1;
-    int infileIndex = -1;
-    bool isAppend = false;
+//     char outfile[BUFF_MAX] = "";
+//     char infile[BUFF_MAX] = "";
+//     int outfileIndex = -1;
+//     int infileIndex = -1;
+//     bool isAppend = false;
 
-    char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
+//     char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
 
-    for (int i = 0; i < numCmds; i++) {
-        parseCmd(cmds[i],MAX_ARGS,cmd,argv,cmdRedirs,filenames,&numArgs,&numRedirsCmd,&numFilenames,&isBg);
-        if (getExecPath(cmds[i], execPath) != 0) {
-            continue;
+//     for (int i = 0; i < numCmds; i++) {
+//         parseCmd(cmds[i],MAX_ARGS,cmd,argv,cmdRedirs,filenames,&numArgs,&numRedirsCmd,&numFilenames,&isBg);
+//         if (getExecPath(cmds[i], execPath) != 0) {
+//             continue;
+//         }
+//         outfileIndex = -1;
+//         infileIndex = -1;
+//         isAppend = false;
+//         for (int j = 0; j < numRedirsCmd; j++) {
+//             k = 0;
+//             if (strcmp(cmdRedirs[j],">>")) {
+//                 outfileIndex = k;
+//                 isAppend = true;
+//             }
+//             else if (strcmp(cmdRedirs[j], ">")) {
+//                 outfileIndex = k;
+//                 isAppend = false;
+//             }
+//             else if (strcmp(cmdRedirs[j], "<")) {
+//                 infileIndex = k;
+//             }
+//             k++;
+//         }
+//         /*
+//         By the end of the redir loop, we'll know where/if we're outputting, how (append or not),
+//         and where we're getting arguments from/if we're getting arguments from file.
+//         */
+//         if (infileIndex != -1) {
+//             //infile = filenames[infileIndex];
+//         }
+//         if (outfileIndex != -1) {
+//             //outfile = filenames[outfileIndex];
+//         }
+//         //execRedir(execPath,argv,numArgs,infile,outfile,isAppend);
+//     }
+//     return 0;
+// }
+
+int execRedir(char *execPath, char **argv, unsigned int arg, char* infile, char* outfile, bool isAppend) {
+    pid_t pid = fork();
+    FILE *ifptr;
+    FILE *ofptr;
+    if (pid == 0) /* Child process */
+    {
+        /* For if there is an outfile in the first place */
+        if (strcmp(outfile,"") != 0) {
+            int fd0 = open(outfile,0644);
+            dup2(fd0,1);
+            close(fd0);
         }
-        outfileIndex = -1;
-        infileIndex = -1;
-        isAppend = false;
-        for (int j = 0; j < numRedirsCmd; j++) {
-            k = 0;
-            if (strcmp(cmdRedirs[j],">>")) {
-                outfileIndex = k;
-                isAppend = true;
-            }
-            else if (strcmp(cmdRedirs[j], ">")) {
-                outfileIndex = k;
-                isAppend = false;
-            }
-            else if (strcmp(cmdRedirs[j], "<")) {
-                infileIndex = k;
-            }
-            k++;
+        if (strcmp(infile, "") != 0) {
+            int fd1 = open(infile, O_RDONLY);
+            dup2(fd1,0);
+            close(fd1);
         }
-        /*
-        By the end of the redir loop, we'll know where/if we're outputting, how (append or not),
-        and where we're getting arguments from/if we're getting arguments from file.
-        */
-        if (infileIndex != -1) {
-            //infile = filenames[infileIndex];
+        if (isBg)
+            setpgid(0,0); /* Put this child into a new process group */
+        execv(execPath, argv);
+        if (!isBg) {
+            int waitstatus;
+            wait(&waitstatus);
+            retVal = WEXITSTATUS(waitstatus);
         }
-        if (outfileIndex != -1) {
-            //outfile = filenames[outfileIndex];
-        }
-        //execRedir(execPath,argv,infile,outfile,isAppend);
+        exit(127); /* If process fails */
     }
-    return 0; /* Placeholder */
+    else /* Parent process */
+    {
+        if (isBg)
+            return 0; /* Don't wait for child process and just return */
+        /* Else wait for process before returning */
+        pid_t r = waitpid(pid, 0, 0);
+        if (r == -1) /* An error occured */
+            return 1;
+        return retVal;
+    }
 }
-
 int getExecPath(char *cmd, char *execPath)
 {
     char path[BUFF_MAX]; /* String to store the current value of PATH */
