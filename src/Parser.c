@@ -402,6 +402,7 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, char 
             /* Take away the quotes and copy into argv */
             strncpy(argv[*numArgs], s + tokPos1 + 1, tokPos2 - tokPos1 - 1);
             argv[*numArgs][tokPos2 - tokPos1 - 1] = '\0';
+            ++(*numArgs);
             ++tokPos2; /* Move past end quote */
         }
         else
@@ -582,13 +583,14 @@ bool parseInvoke(char *s, char **cmds, unsigned int *numCmds, unsigned int *numP
     return true;
 }
 
-/* Evaluate the invocation */
-int evalInvoke(char *s)
-{
-    char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
-    unsigned int numCmds = 0;
-    unsigned int numRedirs = 0;
-    parseInvoke(s, cmds, &numCmds, &numRedirs);
+// /* Evaluate the invocation */
+ int evalInvoke(char *s)
+ {
+     char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
+     char **redirs = (char**) malloc(MAX_ARGS * sizeof(char*));
+     unsigned int numCmds = 0;
+     unsigned int numRedirs = 0;
+     parseInvoke(s, cmds, redirs, &numCmds, &numRedirs);
 
     char cmd[BUFF_MAX] = "";
     char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
@@ -688,6 +690,7 @@ int execRedir(char *execPath, char **argv, unsigned int arg, char* infile, char*
         return retVal;
     }
 }
+
 int getExecPath(char *cmd, char *execPath)
 {
     char path[BUFF_MAX]; /* String to store the current value of PATH */
@@ -922,7 +925,7 @@ char *read_command(void)
 int main()
 {
     init();
-    char s[BUFF_MAX] = "testing test test >> foo < bar < bar > foo &";
+    char s[BUFF_MAX] = "testing test \"test >> foo\" < bar < bar > foo &";
     char cmd[BUFF_MAX];
     char *argv[BUFF_MAX];
     char *redirs[BUFF_MAX];
