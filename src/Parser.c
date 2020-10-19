@@ -583,14 +583,13 @@ bool parseInvoke(char *s, char **cmds, unsigned int *numCmds, unsigned int *numP
     return true;
 }
 
-// /* Evaluate the invocation */
+/* Evaluate the invocation */
  int evalInvoke(char *s)
  {
      char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
-     char **redirs = (char**) malloc(MAX_ARGS * sizeof(char*));
      unsigned int numCmds = 0;
-     unsigned int numRedirs = 0;
-     parseInvoke(s, cmds, redirs, &numCmds, &numRedirs);
+     unsigned int numPipes = 0;
+     parseInvoke(s, cmds, &numCmds, &numPipes);
 
     char cmd[BUFF_MAX] = "";
     char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
