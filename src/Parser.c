@@ -18,6 +18,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <limits.h>
@@ -40,9 +41,11 @@ bool isRedir(char*);
 bool matchBrace(char*, int*, const unsigned int);
 bool matchQuote(char*, int*, const unsigned int);
 bool parseExpr(char*, char*, char*, char*);
+int execRedir(char*, char**, unsigned int, char*, char*, bool, bool);
 bool parseCmd(char*, const unsigned int, char*, char**, char**, char**, unsigned int*, unsigned int*, unsigned int*, bool*);
 bool parseS(char*, char*, char*);
 char* evalArg(char*);
+int getExecPath(char*, char*);
 int evalCmd(char*, unsigned int, char**, bool);
 int evalS(char*);
 int evalExpr(char*);
@@ -579,75 +582,77 @@ bool parseInvoke(char *s, char **cmds, unsigned int *numCmds, unsigned int *numP
     return true;
 }
 
-// /* Evaluate the invocation */
-// int evalInvoke(char *s)
-// {
-//     char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
-//     char **redirs = (char**) malloc(MAX_ARGS * sizeof(char*));
-//     unsigned int numCmds = 0;
-//     unsigned int numRedirs = 0;
-//     parseInvoke(s, cmds, redirs, &numCmds, &numRedirs);
+/* Evaluate the invocation */
+int evalInvoke(char *s)
+{
+    char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
+    unsigned int numCmds = 0;
+    unsigned int numRedirs = 0;
+    parseInvoke(s, cmds, &numCmds, &numRedirs);
 
-//     char cmd[BUFF_MAX] = "";
-//     char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
-//     char **cmdRedirs = (char**) malloc(MAX_ARGS * sizeof(char*));
-//     char **filenames = (char**) malloc(MAX_ARGS * sizeof(char*));
-//     unsigned int numArgs = 0;
-//     unsigned int numRedirsCmd = 0;
-//     unsigned int numFilenames = 0;
-//     bool isBg = false;
+    char cmd[BUFF_MAX] = "";
+    char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
+    char **cmdRedirs = (char**) malloc(MAX_ARGS * sizeof(char*));
+    char **filenames = (char**) malloc(MAX_ARGS * sizeof(char*));
+    unsigned int numArgs = 0;
+    unsigned int numRedirsCmd = 0;
+    unsigned int numFilenames = 0;
+    bool isBg = false;
 
-//     if (numCmds == 0)
-//         return 0;
+    if (numCmds == 0)
+        return 0;
     
-//     char outfile[BUFF_MAX] = "";
-//     char infile[BUFF_MAX] = "";
-//     int outfileIndex = -1;
-//     int infileIndex = -1;
-//     bool isAppend = false;
+    char *outfile = (char*) malloc(sizeof(char*));
+    char *infile = (char*) malloc(sizeof(char*));
+    int outfileIndex = -1;
+    int infileIndex = -1;
+    bool isAppend = false;
+    int k;
 
-//     char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
+    char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
 
-//     for (int i = 0; i < numCmds; i++) {
-//         parseCmd(cmds[i],MAX_ARGS,cmd,argv,cmdRedirs,filenames,&numArgs,&numRedirsCmd,&numFilenames,&isBg);
-//         if (getExecPath(cmds[i], execPath) != 0) {
-//             continue;
-//         }
-//         outfileIndex = -1;
-//         infileIndex = -1;
-//         isAppend = false;
-//         for (int j = 0; j < numRedirsCmd; j++) {
-//             k = 0;
-//             if (strcmp(cmdRedirs[j],">>")) {
-//                 outfileIndex = k;
-//                 isAppend = true;
-//             }
-//             else if (strcmp(cmdRedirs[j], ">")) {
-//                 outfileIndex = k;
-//                 isAppend = false;
-//             }
-//             else if (strcmp(cmdRedirs[j], "<")) {
-//                 infileIndex = k;
-//             }
-//             k++;
-//         }
-//         /*
-//         By the end of the redir loop, we'll know where/if we're outputting, how (append or not),
-//         and where we're getting arguments from/if we're getting arguments from file.
-//         */
-//         if (infileIndex != -1) {
-//             //infile = filenames[infileIndex];
-//         }
-//         if (outfileIndex != -1) {
-//             //outfile = filenames[outfileIndex];
-//         }
-//         //execRedir(execPath,argv,numArgs,infile,outfile,isAppend);
-//     }
-//     return 0;
-// }
+    int r;
+    for (int i = 0; i < numCmds; i++) {
+        parseCmd(cmds[i],MAX_ARGS,cmd,argv,cmdRedirs,filenames,&numArgs,&numRedirsCmd,&numFilenames,&isBg);
+        if ((r = getExecPath(cmds[i], execPath)) != 0) {
+            continue;
+        }
+        outfileIndex = -1;
+        infileIndex = -1;
+        isAppend = false;
+        for (int j = 0; j < numRedirsCmd; j++) {
+            k = 0;
+            if (strcmp(cmdRedirs[j],">>")) {
+                outfileIndex = k;
+                isAppend = true;
+            }
+            else if (strcmp(cmdRedirs[j], ">")) {
+                outfileIndex = k;
+                isAppend = false;
+            }
+            else if (strcmp(cmdRedirs[j], "<")) {
+                infileIndex = k;
+            }
+            k++;
+        }
+        /*
+        By the end of the redir loop, we'll know where/if we're outputting, how (append or not),
+        and where we're getting arguments from/if we're getting arguments from file.
+        */
+        if (infileIndex != -1) {
+            infile = filenames[infileIndex];
+        }
+        if (outfileIndex != -1) {
+            outfile = filenames[outfileIndex];
+        }
+        execRedir(execPath,argv,numArgs,infile,outfile,isAppend,isBg);
+    }
+    return 0;
+}
 
-int execRedir(char *execPath, char **argv, unsigned int arg, char* infile, char* outfile, bool isAppend) {
+int execRedir(char *execPath, char **argv, unsigned int arg, char* infile, char* outfile, bool isAppend, bool isBg) {
     pid_t pid = fork();
+    int retVal = 0;
     
     if (pid == 0) /* Child process */
     {
