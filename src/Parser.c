@@ -70,6 +70,16 @@ bool addConst(char *key, char *val)
             return false;
         }
     }
+    for (unsigned int i = 0; i < numConsts; ++i)
+    {
+
+        if (strcmp(consts[i][0], key) == 0) /* Key already exists */
+        {
+            /* Just update the value */
+            strcpy(consts[i][1], val);
+            return true;
+        }
+    }
     consts[numConsts] = (char**) malloc(2 * sizeof(char*));
     consts[numConsts][0] = (char*) malloc(BUFF_MAX * sizeof(char));
     consts[numConsts][1] = (char*) malloc(BUFF_MAX * sizeof(char));
@@ -109,6 +119,7 @@ bool isOp(char *s)
         switch (s[0])
         {
         case ';':
+        case '=':
             return true;
         default:
             return false;
@@ -268,6 +279,8 @@ bool parseExpr(char *expr, char *s, char *op, char *e)
     strncpy(op, expr + opPos1, opPos2 - opPos1 + 1); /* Store the operator */
     op[opPos2 - opPos1 + 1] = '\0';
     sEnd = opPos1 - 1;
+    while (sEnd > pos1 && isspace(expr[sEnd]))
+        --sEnd;
     strncpy(s, expr + pos1, sEnd - pos1 + 1); /* Store the statement */
     s[sEnd - pos1 + 1] = '\0';
     while (i <= pos2 && isspace(expr[i])) /* Move past white space seperation */
