@@ -1,4 +1,4 @@
-#include "Parser.c"
+#include "Parser.h"
 
 int main() {
    init();
@@ -19,7 +19,7 @@ int main() {
     }
     
     char *userInput = NULL;
-
+    puts("Welcome to soyshell!");
     while (1) {
         if (getcwd(d, sizeof(d)) == NULL) {
             return 0;
@@ -27,7 +27,7 @@ int main() {
         i = strlen(d);
         while (i > 0 && d[i-1] != '/')
             i--;
-        printf("%s@soyshell %s> ", user, d +i);
+        printf("%s@soyshell %s > ", user, d +i);
         if ((nread = getline(&userInput,&n, stdin)) == -1) {
             printf("%s\n","Failed to read stdin");
             continue;
@@ -35,13 +35,14 @@ int main() {
         int len = strlen(userInput);
         if (userInput[len-1] == '\n')
             userInput[len-1] = 0;
-        if (strcmp(userInput,"exit") == 0) {
+        if (strncmp(userInput, "exit", 4) == 0) {
             return 0;
-        }if (strcmp(userInput, "") == 0)
-        {
+        }
+        if (strcmp(userInput, "") == 0) {
             continue;
         }
-        evalS(userInput);
+        lastResult = evalExpr(userInput);
     }
+    finish();
     return 0;  
 }
