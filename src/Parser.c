@@ -716,6 +716,7 @@ int evalCmd(int in, int out, char* s)
                     return 1;
                 }
                 dup2(fd, 0);
+                close(fd);
             }
             if (strcmp(redirs[i], ">") == 0) /* Output redirection */
             {
@@ -733,6 +734,7 @@ int evalCmd(int in, int out, char* s)
                     return 1;
                 }
                 dup2(fd, 1);
+                close(fd);
             }
             if (strcmp(redirs[i], ">>") == 0) /* Output with append */
             {
@@ -750,6 +752,7 @@ int evalCmd(int in, int out, char* s)
                     return 1;
                 }
                 dup2(fd, 1);
+                close(fd);
             }
         }
         /* Deal with specified piping */
