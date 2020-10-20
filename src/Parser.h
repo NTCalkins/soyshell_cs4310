@@ -6,7 +6,7 @@
   invoke: cmd [ + | + cmd ]...
   op: && / || / ; / =
   redir: < / > / >>
-  cmd: EXECUTABLE [+ arg]... [ + &] [+ redir + FILE_NAME/DELIM]
+  cmd: EXECUTABLE [+ arg]... [+ redir + FILE_NAME/DELIM] [ + &]
   arg: $NAMED_CONSTANT / LITERAL
 
   IMPORTANT: Don't forget to call init() to intialize the array of user
