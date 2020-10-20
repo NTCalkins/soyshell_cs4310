@@ -23,10 +23,11 @@
     redir: &lt; | &gt; | &gt;&gt;<br>
     cmd: EXECUTABLE [+ arg]... [+ redir + FILE_NAME]... [+ &]<br>
     arg: $NAMED_CONSTANT | LITERAL<br>
-  </strong>    
+  </strong>
+  This mimics the syntax of most POSIX shells with the exception of the = operator.
 </p>
 <h3>Behavioral Nuances</h3>
 <p>
-  For the purposes of the assignment, the default value for PATH consists solely of the current directory the shell was called in plus "/bin". This ensures that the shell will use the commands written for the assignment by default. Additional directories can be appended to the path variable using the = operator with ':' as the separator (e.g. PATH = $PATH:/bin).
+  For the purposes of the assignment, the default value for PATH consists solely of the current directory the shell was called in plus "/bin". This ensures that the shell will use the commands written for the assignment by default. Additional directories can be appended to the path variable using the = operator with ':' as the separator (e.g. PATH = $PATH:/bin).<br>
   Due to the nature of the grammar and our decision to treat the assignment operator = as a proper operator and not an exception of cmd, = must be separated by white space. This differs from the behavior of most shells. Additionally, in the case of cascading output redirection (e.g. ls > foo.txt > bar.txt), output will only be written to the file associated with the last redirection operator (bar.txt in this case). This matches the behavior of some shells but noticeably differs from the behavior of shells like zsh.
 </p>
