@@ -12,43 +12,7 @@
   IMPORTANT: Don't forget to call init() to intialize the array of user
   defined constants and finish() to cleanup the array
 */
-#include <stdbool.h>
-#include <string.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <limits.h>
-#define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */
-#define INVALID_POS -1
-#define INIT_CONSTS 8 /* Initial number of constants to allocate memory for */
-#define MAX_ARGS 1024 /* Maximum number of arguments in argv */
-
-char ***consts; /* Array of string pairs to store user defined constants. If we have more time, this should be replaced with a BST */
-unsigned int numConsts; /* Current number of constants ie. next free index */
-unsigned int maxConsts; /* Current maximum number of user defined constants */
-
-void init();
-void finish();
-bool addConst(char*, char*);
-char* getConst(char*);
-bool isOp(char*);
-bool isPipe(char*);
-bool isRedir(char*);
-bool matchBrace(char*, int*, const unsigned int);
-bool matchQuote(char*, int*, const unsigned int);
-bool parseExpr(char*, char*, char*, char*);
-int execRedir(char*, char**, unsigned int, char*, char*, bool, bool);
-bool parseCmd(char*, const unsigned int, char*, char**, char**, char**, unsigned int*, unsigned int*, unsigned int*, bool*);
-bool parseS(char*, char*, char*);
-char* evalArg(char*);
-int getExecPath(char*, char*);
-int evalCmd(char*, unsigned int, char**, bool);
-int evalS(char*);
-int evalExpr(char*);
+#include "Parser.h"
 
 /* Initialize the global variables */
 void init()
@@ -184,26 +148,6 @@ bool isRedir(char *s)
     }
     if (strcmp(s, ">>") == 0)
         return true;
-    return false;
-}
-
-bool containsOp(char *s)
-{
-    char substr[3];
-    for (int i = 0; i < strlen(s); i++) {
-        memcpy(substr,&s[0+i],1);
-        substr[1] = '\0';
-        if (isOp(substr)) {
-            return true;
-        }
-        if (strlen(s) - i >= 2) {
-            memcpy(substr,&s[0+i],2);
-            substr[2] = '\0';
-            if (isOp(substr)) {
-                return true;
-            }
-        }
-    }
     return false;
 }
 
@@ -467,30 +411,25 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, char 
 }
 
 /*
-  Parse the statement into either an expression or a command
-  If s is an expression enclosed in braces, it will be stored in e and cmd will be the empty string
-  If s is simply a command, it will be stored in cmd and e will be the empty string
+  Parse the statement into either an expression or a invocation
+  If s is an expression enclosed in braces, it will be stored in e and inv will be the empty string
+  If s is simply a invokation, it will be stored in inv and e will be the empty string
   s: The statement to be parsed
   e: String to store the parsed expression
-  cmd: String to store the parsed command
+  inv: String to store the parsed command
 */
-bool parseS(char *s, char *e, char *cmd)
+bool parseS(char *s, char *e, char *inv)
 {
     int pos1 = 0;
     int pos2 = strlen(s) - 1;
     e[0] = '\0';
-    cmd[0] = '\0';
+    inv[0] = '\0';
     if (strlen(s) == 0) /* Empty expression passed */
         return false;
     while (pos2 > pos1 && isspace(s[pos2])) /* Remove trailing whitespace */
         --pos2;
     while (pos1 <= pos2 && isspace(s[pos1])) /* Ignore leading whitespace */
         ++pos1;
-    if (containsOp(s)) {
-        strncpy(e, s + pos1, pos2 - pos1 + 1);
-        s[pos2 - pos1 + 1] = '\0';
-        return true;
-    }
     if (s[pos1] == '{') /* Statement is an expression enclosed in braces */
     {
         if (s[pos2] != '}')
@@ -507,8 +446,8 @@ bool parseS(char *s, char *e, char *cmd)
         s[pos2 - pos1 + 1] = '\0';
         return true;
     }
-    /* Statement is a command */
-    strncpy(cmd, s + pos1, pos2 - pos1 + 1);
+    /* Statement is a invocation */
+    strncpy(inv, s + pos1, pos2 - pos1 + 1);
     s[pos2 - pos1 + 1] = '\0';
     return true;
 }
@@ -517,7 +456,6 @@ bool parseS(char *s, char *e, char *cmd)
   Parse an invocation consisting of a series of commands and redirections
   s: String to be parsed
   cmds: Array of unallocated char pointers to store the parsed commands
-  redirs: Array of unallocated char pointers to store the parsed redirection operators
   numCmds: Int to store the number of parsed commands
   numRedirs: Int to store the number of parsed redirection operators
 */
@@ -584,113 +522,45 @@ bool parseInvoke(char *s, char **cmds, unsigned int *numCmds, unsigned int *numP
 }
 
 /* Evaluate the invocation */
- int evalInvoke(char *s)
- {
-     char **cmds = (char**) malloc(MAX_ARGS * sizeof(char*));
-     unsigned int numCmds = 0;
-     unsigned int numPipes = 0;
-     parseInvoke(s, cmds, &numCmds, &numPipes);
-
-    char cmd[BUFF_MAX] = "";
-    char **argv = (char**) malloc(MAX_ARGS * sizeof(char*));
-    char **cmdRedirs = (char**) malloc(MAX_ARGS * sizeof(char*));
-    char **filenames = (char**) malloc(MAX_ARGS * sizeof(char*));
-    unsigned int numArgs = 0;
-    unsigned int numRedirsCmd = 0;
-    unsigned int numFilenames = 0;
-    bool isBg = false;
-
-    if (numCmds == 0)
+int evalInvoke(char *s)
+{
+    /* For parseInvoke */
+    char *cmds[MAX_ARGS]; /* Array to store the commands parsed */
+    unsigned int numCmds; /* Number of commands extracted */
+    unsigned int numPipes; /* Number of pipes extracted */
+    /* File descriptors to handle forking */
+    int in = 0;
+    int fd[2];
+    bool ok;
+    if (strlen(s) == 0) /* Empty string passed */
         return 0;
-    
-    char *outfile = (char*) malloc(sizeof(char*));
-    char *infile = (char*) malloc(sizeof(char*));
-    int outfileIndex = -1;
-    int infileIndex = -1;
-    bool isAppend = false;
-    int k;
-
-    char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
-
-    int r;
-    for (int i = 0; i < numCmds; i++) {
-        parseCmd(cmds[i],MAX_ARGS,cmd,argv,cmdRedirs,filenames,&numArgs,&numRedirsCmd,&numFilenames,&isBg);
-        if ((r = getExecPath(cmds[i], execPath)) != 0) {
-            continue;
-        }
-        outfileIndex = -1;
-        infileIndex = -1;
-        isAppend = false;
-        for (int j = 0; j < numRedirsCmd; j++) {
-            k = 0;
-            if (strcmp(cmdRedirs[j],">>")) {
-                outfileIndex = k;
-                isAppend = true;
-            }
-            else if (strcmp(cmdRedirs[j], ">")) {
-                outfileIndex = k;
-                isAppend = false;
-            }
-            else if (strcmp(cmdRedirs[j], "<")) {
-                infileIndex = k;
-            }
-            k++;
-        }
-        /*
-        By the end of the redir loop, we'll know where/if we're outputting, how (append or not),
-        and where we're getting arguments from/if we're getting arguments from file.
-        */
-        if (infileIndex != -1) {
-            infile = filenames[infileIndex];
-        }
-        if (outfileIndex != -1) {
-            outfile = filenames[outfileIndex];
-        }
-        execRedir(execPath,argv,numArgs,infile,outfile,isAppend,isBg);
+    ok = parseInvoke(s, cmds, &numCmds, &numPipes);
+    if (!ok) /* Failed to parse */
+        return 1;
+    if (numPipes == 0) /* No pipes, just a single command */
+    {
+        /* Free cmds */
+        for (unsigned int i = 0; i < numCmds; ++i)
+            free(cmds[i]);
+        return evalCmd(0, 1, s); /* Just evaluate the command */
     }
-    return 0;
+    /* Process the pipes */
+    for (unsigned int i = 0; i < numPipes; ++i)
+    {
+        pipe(fd);
+        evalCmd(in, fd[1], cmds[i]);
+        close(fd[1]); /* No longer need write end of pipe */
+        in = fd[0]; /* Keep read end of pipe */
+    }
+    /* Handle last stage of pipe */
+    int r = evalCmd(in, 1, cmds[numPipes]);
+    /* Free cmds */
+    for (unsigned int i = 0; i < numCmds; ++i)
+        free(cmds[i]);
+    return r;
 }
 
-int execRedir(char *execPath, char **argv, unsigned int arg, char* infile, char* outfile, bool isAppend, bool isBg) {
-    pid_t pid = fork();
-    int retVal = 0;
-    
-    if (pid == 0) /* Child process */
-    {
-        /* For if there is an outfile in the first place */
-        if (strcmp(outfile,"") != 0) {
-            int fd0 = open(outfile,0644);
-            dup2(fd0,1);
-            close(fd0);
-        }
-        if (strcmp(infile, "") != 0) {
-            int fd1 = open(infile, O_RDONLY);
-            dup2(fd1,0);
-            close(fd1);
-        }
-        if (isBg)
-            setpgid(0,0); /* Put this child into a new process group */
-        execv(execPath, argv);
-        if (!isBg) {
-            int waitstatus;
-            wait(&waitstatus);
-            retVal = WEXITSTATUS(waitstatus);
-        }
-        exit(127); /* If process fails */
-    }
-    else /* Parent process */
-    {
-        if (isBg)
-            return 0; /* Don't wait for child process and just return */
-        /* Else wait for process before returning */
-        pid_t r = waitpid(pid, 0, 0);
-        if (r == -1) /* An error occured */
-            return 1;
-        return retVal;
-    }
-}
-
-int getExecPath(char *cmd, char *execPath)
+bool getExecPath(char *cmd, char *execPath)
 {
     char path[BUFF_MAX]; /* String to store the current value of PATH */
     strcpy(path, consts[0][1]); /* Get the current PATH value */
@@ -721,10 +591,8 @@ int getExecPath(char *cmd, char *execPath)
         }
     }
     if (access(execPath, X_OK) != -1)
-    {
-        return 0;
-    }
-    return 1;
+        return true;
+    return false;
 }
 
 /*
@@ -772,96 +640,224 @@ char* evalArg(char *arg)
 }
 
 /* Evaluate the command and run the executable */
-int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg)
-{ /* TODO: Update this in accordance with new grammar */
-    char path[BUFF_MAX]; /* String to store the current value of PATH */
-    char execPath[BUFF_MAX]; /* Resulting path to the executable we want to run */
-    strcpy(path, consts[0][1]); /* Get the current PATH value */
-    char *tok = NULL;
-    bool isPath = false; /* Is the given command already a path to an executable */
-    char *ptr = argv[0];
-    int retVal = 0;
-    if (*ptr == 'c' && *(++ptr) == 'd') {
-        if (argc != 2) {
-            printf("Only one argument allowed\n");
-            return 1;
-        }
-        int r = chdir(argv[1]);
-        if (r == 0) {
-            return 0;
-        }
-        else {
-            printf("cd %s: No such file or directory\n", argv[1]);
-            return 1;
-        }
-    }
-
-    for (unsigned int i = 0; i < strlen(cmd); ++i) /* Look for a '/' to signal that cmd is already a path */
+int evalCmd(int in, int out, char* s)
+{
+    char cmd[BUFF_MAX]; /* Command name */
+    char *argv[MAX_ARGS]; /* Argument list */
+    char *redirs[MAX_ARGS]; /* List of redirection operators */
+    char *filenames[MAX_ARGS]; /* List of filenames associated with redirection operators */
+    char exec[BUFF_MAX]; /* Path to executable associated with command name */
+    unsigned int numArgs;
+    unsigned int numRedirs;
+    unsigned int numFilenames;
+    bool isBg; /* Was a & passed to indicate a background process */
+    bool ok;
+    int fd; /* File descriptor returned by open */
+    pid_t pid;
+    ok = parseCmd(s, MAX_ARGS, cmd, argv, redirs, filenames, &numArgs, &numRedirs, &numFilenames, &isBg);
+    if (!ok) /* Failed to parse */
+        return 1;
+    if (numRedirs != numFilenames)
     {
-        if (cmd[i] == '/')
-        {
-            isPath = true;
-            break;
-        }
+        fprintf(stderr, "evalCmd: expected filename after \'%s\'\n", redirs[numRedirs - 1]);
+        /* Clean up */
+        for (unsigned int i = 0; i < numArgs; ++i)
+            free(argv[i]);
+        for (unsigned int i = 0; i < numRedirs; ++i)
+            free(redirs[i]);
+        for (unsigned int i = 0; i < numFilenames; ++i)
+            free(filenames[i]);
+        return 1;
     }
-    if (isPath)
-        strcpy(execPath, cmd);
-    else
+    ok = getExecPath(cmd, exec);
+    if (!ok) /* Failed to get valid path to executable */
     {
-        tok = strtok(path, ":");
-        while (tok != NULL)
-        {
-            /* Generate possible executable path using value in PATH and cmd */
-            strcpy(execPath, tok);
-            strcat(execPath, "/");
-            strcat(execPath, cmd);
-            if (access(execPath, X_OK) != -1) /* Found an appropriate executable */
-                break;
-            tok = strtok(NULL, ":");
-        }
+        fprintf(stderr, "\'%s\' is not a valid command\n", cmd);
+        /* Clean up */
+        for (unsigned int i = 0; i < numArgs; ++i)
+            free(argv[i]);
+        for (unsigned int i = 0; i < numRedirs; ++i)
+            free(redirs[i]);
+        for (unsigned int i = 0; i < numFilenames; ++i)
+            free(filenames[i]);
+        return 1;
     }
-    if (access(execPath, X_OK) != -1)
+    pid = fork();
+    if (pid == 0) /* Child process */
     {
-        pid_t pid = fork();
-        if (pid == 0) /* Child process */
+        for (unsigned int i = 0; i < numRedirs; ++i)
         {
-            if (isBg)
-                setpgid(0,0); /* Put this child into a new process group */
-            execv(execPath, argv);
-            if (!isBg) {
-                int waitstatus;
-                wait(&waitstatus);
-                retVal = WEXITSTATUS(waitstatus);
+            if (strcmp(redirs[i], "<") == 0) /* Input redirection */
+            {
+                fd = open(filenames[i], O_RDONLY);
+                if (fd == -1)
+                {
+                    fprintf(stderr, "evalCmd: could not open file \'%s\' for reading\n", filenames[i]);
+                    /* Clean up */
+                    for (unsigned int i = 0; i < numArgs; ++i)
+                        free(argv[i]);
+                    for (unsigned int i = 0; i < numRedirs; ++i)
+                        free(redirs[i]);
+                    for (unsigned int i = 0; i < numFilenames; ++i)
+                        free(filenames[i]);
+                    return 1;
+                }
+                dup2(fd, 0);
             }
-            exit(127); /* If process fails */
+            if (strcmp(redirs[i], ">") == 0) /* Output redirection */
+            {
+                fd = open(filenames[i], O_WRONLY | O_CREAT);
+                if (fd == -1)
+                {
+                    fprintf(stderr, "evalCmd: could not open file \'%s\' for writing\n", filenames[i]);
+                    /* Clean up */
+                    for (unsigned int i = 0; i < numArgs; ++i)
+                        free(argv[i]);
+                    for (unsigned int i = 0; i < numRedirs; ++i)
+                        free(redirs[i]);
+                    for (unsigned int i = 0; i < numFilenames; ++i)
+                        free(filenames[i]);
+                    return 1;
+                }
+                dup2(fd, 1);
+            }
+            if (strcmp(redirs[i], ">>") == 0) /* Output with append */
+            {
+                fd = open(filenames[i], O_WRONLY | O_APPEND | O_CREAT);
+                if (fd == -1)
+                {
+                    fprintf(stderr, "evalCmd: could not open file \'%s\' for writing\n", filenames[i]);
+                    /* Clean up */
+                    for (unsigned int i = 0; i < numArgs; ++i)
+                        free(argv[i]);
+                    for (unsigned int i = 0; i < numRedirs; ++i)
+                        free(redirs[i]);
+                    for (unsigned int i = 0; i < numFilenames; ++i)
+                        free(filenames[i]);
+                    return 1;
+                }
+                dup2(fd, 1);
+            }
         }
-        else /* Parent process */
+        /* Deal with specified piping */
+        if (in != 0) /* in is not stdin */
         {
-            if (isBg)
-                return 0; /* Don't wait for child process and just return */
-            /* Else wait for process before returning */
-            pid_t r = waitpid(pid, 0, 0);
-            if (r == -1) /* An error occured */
-                return 1;
-            return retVal;
+            dup2(in, 0); /* Use it as stdin */
+            close(in);
         }
+        if (out != 1) /* out is not stdout */
+        {
+            dup2(out, 1); /* Use it as stdout */
+            close(out);
+        }
+        execvp(exec, argv);
     }
-    fprintf(stderr, "\'%s\' is not a valid command\n", cmd);
-    return 1;
+    /* Parent process */
+    /* Clean up */
+    for (unsigned int i = 0; i < numArgs; ++i)
+        free(argv[i]);
+    for (unsigned int i = 0; i < numRedirs; ++i)
+        free(redirs[i]);
+    for (unsigned int i = 0; i < numFilenames; ++i)
+        free(filenames[i]);
+    if (isBg) /* Don't wait for background process. TODO: This might break things. Needs testing */
+        return 0;
+    pid_t r = waitpid(pid, 0, 0);
+    if (r == -1) /* Error occurred */
+        return 1;
+    return 0;
 }
+
+/* int evalCmd(char *cmd, unsigned int argc, char **argv, bool isBg) */
+/* { /\* TODO: Update this in accordance with new grammar *\/ */
+/*     char path[BUFF_MAX]; /\* String to store the current value of PATH *\/ */
+/*     char execPath[BUFF_MAX]; /\* Resulting path to the executable we want to run *\/ */
+/*     strcpy(path, consts[0][1]); /\* Get the current PATH value *\/ */
+/*     char *tok = NULL; */
+/*     bool isPath = false; /\* Is the given command already a path to an executable *\/ */
+/*     char *ptr = argv[0]; */
+/*     int retVal = 0; */
+/*     if (*ptr == 'c' && *(++ptr) == 'd') { */
+/*         if (argc != 2) { */
+/*             printf("Only one argument allowed\n"); */
+/*             return 1; */
+/*         } */
+/*         int r = chdir(argv[1]); */
+/*         if (r == 0) { */
+/*             return 0; */
+/*         } */
+/*         else { */
+/*             printf("cd %s: No such file or directory\n", argv[1]); */
+/*             return 1; */
+/*         } */
+/*     } */
+
+/*     for (unsigned int i = 0; i < strlen(cmd); ++i) /\* Look for a '/' to signal that cmd is already a path *\/ */
+/*     { */
+/*         if (cmd[i] == '/') */
+/*         { */
+/*             isPath = true; */
+/*             break; */
+/*         } */
+/*     } */
+/*     if (isPath) */
+/*         strcpy(execPath, cmd); */
+/*     else */
+/*     { */
+/*         tok = strtok(path, ":"); */
+/*         while (tok != NULL) */
+/*         { */
+/*             /\* Generate possible executable path using value in PATH and cmd *\/ */
+/*             strcpy(execPath, tok); */
+/*             strcat(execPath, "/"); */
+/*             strcat(execPath, cmd); */
+/*             if (access(execPath, X_OK) != -1) /\* Found an appropriate executable *\/ */
+/*                 break; */
+/*             tok = strtok(NULL, ":"); */
+/*         } */
+/*     } */
+/*     if (access(execPath, X_OK) != -1) */
+/*     { */
+/*         pid_t pid = fork(); */
+/*         if (pid == 0) /\* Child process *\/ */
+/*         { */
+/*             if (isBg) */
+/*                 setpgid(0,0); /\* Put this child into a new process group *\/ */
+/*             execv(execPath, argv); */
+/*             if (!isBg) { */
+/*                 int waitstatus; */
+/*                 wait(&waitstatus); */
+/*                 retVal = WEXITSTATUS(waitstatus); */
+/*             } */
+/*             exit(127); /\* If process fails *\/ */
+/*         } */
+/*         else /\* Parent process *\/ */
+/*         { */
+/*             if (isBg) */
+/*                 return 0; /\* Don't wait for child process and just return *\/ */
+/*             /\* Else wait for process before returning *\/ */
+/*             pid_t r = waitpid(pid, 0, 0); */
+/*             if (r == -1) /\* An error occured *\/ */
+/*                 return 1; */
+/*             return retVal; */
+/*         } */
+/*     } */
+/*     fprintf(stderr, "\'%s\' is not a valid command\n", cmd); */
+/*     return 1; */
+/* } */
 
 /* Evaluate the statement */
 int evalS(char *s)
 {
     char e[BUFF_MAX] = "";
-    char cmd[BUFF_MAX] = "";
-    bool ok = parseS(s, e, cmd);
+    char inv[BUFF_MAX] = "";
+    bool ok = parseS(s, e, inv);
     if (!ok)
         return 1;
-    if (strlen(cmd) == 0) /* Statement is a braced expression */
+    if (strlen(inv) == 0) /* Statement is a braced expression */
         return evalExpr(e);
     /* Else statement is an invocation */
-    return evalInvoke(s);
+    return evalInvoke(inv);
 }
 
 /* Evaluate the expression. Assume that there are no trailing whitespaces */
@@ -918,46 +914,4 @@ char *read_command(void)
     if (getline(&command, &n, stdin) == -1)
         return NULL;
     return command;
-}
-
-/* Test driver */
-int main()
-{
-    init();
-    char s[BUFF_MAX] = "testing test \"test >> foo\" < bar < bar > foo &";
-    char cmd[BUFF_MAX];
-    char *argv[BUFF_MAX];
-    char *redirs[BUFF_MAX];
-    char *filenames[BUFF_MAX];
-    unsigned int numArgs;
-    unsigned int numRedirs;
-    unsigned int numFilenames;
-    bool isBg;
-    bool ok = parseCmd(s, MAX_ARGS, cmd, argv, redirs, filenames, &numArgs, &numRedirs, &numFilenames, &isBg);
-    printf("Command parsed: %s\n", s);
-    if (ok)
-    {
-        printf("Command name: %s\n", cmd);
-        printf("Background: %d\n", isBg);
-        puts("Args...");
-        for (unsigned int i = 0; i < numArgs; ++i)
-        {
-            puts(argv[i]);
-            free(argv[i]);
-        }
-        puts("Redirs...");
-        for (unsigned int i = 0; i < numRedirs; ++i)
-        {
-            puts(redirs[i]);
-            free(redirs[i]);
-        }
-        puts("Filenames...");
-        for (unsigned int i = 0; i < numFilenames; ++i)
-        {
-            puts(filenames[i]);
-            free(filenames[i]);
-        }
-    }
-    finish();
-    return 0;
 }
