@@ -1,0 +1,4 @@
+- Designed the grammar and parser for the shell
+- Implemented the parser in Parser.h and Parser.c
+- Wrote the Makefile
+- Contributed to the "Design" section of the report
