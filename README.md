@@ -14,16 +14,16 @@
 <h3>Grammar</h3>
 <p>
   The syntax of expressions processed by soyshell follows this grammar.<br>
-  <code>
-    ('+' = mandatory presence of whitespace)
-    expr: s | s + op + expr
-    s: {expr} | invoke
-    invoke: cmd [+ '|' + cmd]...
-    op: && | '||' | ; | =
-    redir: &lt; | &gt; | &gt;&gt;
-    cmd: EXECUTABLE [+ arg]... [+ redir + FILE_NAME]... [+ &]
-    arg: $NAMED_CONSTANT | LITERAL
-  </code>
+  <strong>
+    ('+' = mandatory presence of whitespace)<br>
+    expr: s | s + op + expr<br>
+    s: {expr} | invoke<br>
+    invoke: cmd [+ '|' + cmd]...<br>
+    op: && | '||' | ; | =<br>
+    redir: &lt; | &gt; | &gt;&gt;<br>
+    cmd: EXECUTABLE [+ arg]... [+ redir + FILE_NAME]... [+ &]<br>
+    arg: $NAMED_CONSTANT | LITERAL<br>
+  </strong>    
 </p>
 <h3>Behavioral Nuances</h3>
 <p>
