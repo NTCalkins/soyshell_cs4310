@@ -682,6 +682,28 @@ int evalCmd(int in, int out, char* s)
             free(filenames[i]);
         return 1;
     }
+    if (strcmp(cmd, "cd") == 0) /* Special case for cd */
+    {
+        int retVal = 0;
+        if (numArgs != 2)
+        {
+            fprintf(stderr, "cd: invalid number of arguments\n");
+            retVal = 1;
+        }
+        else if (chdir(argv[1]) == -1)
+        {
+            fprintf(stderr, "cd: failed to change directory\n");
+            retVal = 1;
+        }
+        /* Clean up */
+        for (unsigned int i = 0; i < numArgs; ++i)
+            free(argv[i]);
+        for (unsigned int i = 0; i < numRedirs; ++i)
+            free(redirs[i]);
+        for (unsigned int i = 0; i < numFilenames; ++i)
+            free(filenames[i]);
+        return retVal;
+    }
     ok = getExecPath(cmd, exec);
     if (!ok) /* Failed to get valid path to executable */
     {
