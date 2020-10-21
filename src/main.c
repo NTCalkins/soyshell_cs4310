@@ -41,8 +41,9 @@ int main() {
         if (len == 0) /* Empty expression */
             continue;
         lastResult = evalExpr(expr);
+        free(expr);
+        expr = NULL;
     }
-    free(expr);
     finish();
     return 0;  
 }
