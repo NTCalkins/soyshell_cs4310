@@ -18,7 +18,7 @@ int main() {
         strncpy(user,"anonymous",10);
     }
     
-    char *userInput = NULL;
+    char *expr = NULL;
     puts("Welcome to soyshell!");
     while (1) {
         if (getcwd(d, sizeof(d)) == NULL) {
@@ -28,21 +28,21 @@ int main() {
         while (i > 0 && d[i-1] != '/')
             i--;
         printf("%s@soyshell %s > ", user, d +i);
-        if ((nread = getline(&userInput,&n, stdin)) == -1) {
+        if ((nread = getline(&expr,&n, stdin)) == -1) {
             printf("%s\n","Failed to read stdin");
             continue;
         }
-        int len = strlen(userInput);
-        if (userInput[len-1] == '\n')
-            userInput[len-1] = 0;
-        if (strncmp(userInput, "exit", 4) == 0) {
+        int len = strlen(expr);
+        if (expr[len-1] == '\n')
+            expr[len-1] = 0;
+        if (strncmp(expr, "exit", 4) == 0) {
             return 0;
         }
-        if (strcmp(userInput, "") == 0) {
+        if (len == 0) /* Empty expression */
             continue;
-        }
-        lastResult = evalExpr(userInput);
+        lastResult = evalExpr(expr);
     }
+    free(expr);
     finish();
     return 0;  
 }

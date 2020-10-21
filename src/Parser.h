@@ -51,4 +51,3 @@ int evalCmd(int, int, char*);
 int evalInvoke(char*);
 int evalS(char*);
 int evalExpr(char*);
-char *read_command(void);

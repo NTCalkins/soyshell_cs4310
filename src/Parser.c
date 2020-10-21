@@ -72,7 +72,6 @@ bool addConst(char *key, char *val)
     }
     for (unsigned int i = 0; i < numConsts; ++i)
     {
-
         if (strcmp(consts[i][0], key) == 0) /* Key already exists */
         {
             /* Just update the value */
@@ -545,28 +544,27 @@ int evalInvoke(char *s)
     int in = 0;
     int fd[2];
     bool ok;
+    int r;
     if (strlen(s) == 0) /* Empty string passed */
         return 0;
     ok = parseInvoke(s, cmds, &numCmds, &numPipes);
     if (!ok) /* Failed to parse */
         return 1;
     if (numPipes == 0) /* No pipes, just a single command */
+        r = evalCmd(0, 1, cmds[0]);
+    /* Process pipes */
+    else
     {
-        /* Free cmds */
-        for (unsigned int i = 0; i < numCmds; ++i)
-            free(cmds[i]);
-        return evalCmd(0, 1, s); /* Just evaluate the command */
+        for (unsigned int i = 0; i < numCmds - 1; ++i)
+        {
+            pipe(fd);
+            evalCmd(in, fd[1], cmds[i]);
+            close(fd[1]); /* No longer need write end of pipe */
+            in = fd[0]; /* Keep read end of pipe */
+        }
+        /* Handle last stage of pipe */
+        r = evalCmd(in, 1, cmds[numCmds - 1]);
     }
-    /* Process the pipes */
-    for (unsigned int i = 0; i < numPipes; ++i)
-    {
-        pipe(fd);
-        evalCmd(in, fd[1], cmds[i]);
-        close(fd[1]); /* No longer need write end of pipe */
-        in = fd[0]; /* Keep read end of pipe */
-    }
-    /* Handle last stage of pipe */
-    int r = evalCmd(in, 1, cmds[numPipes]);
     /* Free cmds */
     for (unsigned int i = 0; i < numCmds; ++i)
         free(cmds[i]);
@@ -728,13 +726,6 @@ int evalCmd(int in, int out, char* s)
                 if (fd == -1)
                 {
                     fprintf(stderr, "evalCmd: could not open file \'%s\' for reading\n", filenames[i]);
-                    /* Clean up */
-                    for (unsigned int i = 0; i < numArgs; ++i)
-                        free(argv[i]);
-                    for (unsigned int i = 0; i < numRedirs; ++i)
-                        free(redirs[i]);
-                    for (unsigned int i = 0; i < numFilenames; ++i)
-                        free(filenames[i]);
                     return 1;
                 }
                 dup2(fd, 0);
@@ -746,13 +737,6 @@ int evalCmd(int in, int out, char* s)
                 if (fd == -1)
                 {
                     fprintf(stderr, "evalCmd: could not open file \'%s\' for writing\n", filenames[i]);
-                    /* Clean up */
-                    for (unsigned int i = 0; i < numArgs; ++i)
-                        free(argv[i]);
-                    for (unsigned int i = 0; i < numRedirs; ++i)
-                        free(redirs[i]);
-                    for (unsigned int i = 0; i < numFilenames; ++i)
-                        free(filenames[i]);
                     return 1;
                 }
                 dup2(fd, 1);
@@ -764,13 +748,6 @@ int evalCmd(int in, int out, char* s)
                 if (fd == -1)
                 {
                     fprintf(stderr, "evalCmd: could not open file \'%s\' for writing\n", filenames[i]);
-                    /* Clean up */
-                    for (unsigned int i = 0; i < numArgs; ++i)
-                        free(argv[i]);
-                    for (unsigned int i = 0; i < numRedirs; ++i)
-                        free(redirs[i]);
-                    for (unsigned int i = 0; i < numFilenames; ++i)
-                        free(filenames[i]);
                     return 1;
                 }
                 dup2(fd, 1);
@@ -791,6 +768,7 @@ int evalCmd(int in, int out, char* s)
         execvp(exec, argv);
     }
     /* Parent process */
+    pid_t r = 0;
     /* Clean up */
     for (unsigned int i = 0; i < numArgs; ++i)
         free(argv[i]);
@@ -798,12 +776,10 @@ int evalCmd(int in, int out, char* s)
         free(redirs[i]);
     for (unsigned int i = 0; i < numFilenames; ++i)
         free(filenames[i]);
-    if (isBg) /* Don't wait for background process. TODO: This might break things. Needs testing */
+    if (isBg) /* Don't wait for background process */
         return 0;
-    pid_t r = waitpid(pid, 0, 0);
-    if (r == -1) /* Error occurred */
-        return 1;
-    return 0;
+    r = waitpid(pid, 0, 0);
+    return r;
 }
 
 /* Evaluate the statement */
@@ -826,7 +802,7 @@ int evalExpr(char *expr)
     char left[BUFF_MAX];
     char op[BUFF_MAX];
     char right[BUFF_MAX];
-    int l_code, r_code;
+    int l_code;
     if (strlen(expr) == 0) /* Empty expression */
         return 0;
     parseExpr(expr,left,op,right);
@@ -837,11 +813,20 @@ int evalExpr(char *expr)
         fprintf(stderr, "evalExpr: expected right hand expression for operator\n");
         return 1;
     }
+    if (strcmp(op, "=") == 0) /* Assignment operator */
+    {
+        /* Left is the key, right is the val */
+        evalArg(right);
+        bool ok = addConst(left, right);
+        if (!ok)
+            return 1;
+        return 0;
+    }
     if (strcmp(op, "&&") == 0) /* AND operator */
     {
         l_code = evalS(left);
         if (l_code == 0)
-            r_code = evalExpr(right);
+            return evalExpr(right);
     }
     else if (strcmp(op, "||") == 0) /* OR operator */
     {
@@ -855,23 +840,10 @@ int evalExpr(char *expr)
         evalS(left);
         return evalExpr(right);
     }
-    else if (strcmp(op, "=") == 0) /* Assignment operator */
+    else
     {
-        /* Left is the key, right is the val */
-        bool ok = addConst(left, right);
-        if (!ok)
-            return 1;
-        return 0;
+        fprintf(stderr, "\'%s\' is not an operator\n", op);
+        return 1;
     }
     return 0;
-}
-
-char *read_command(void)
-{
-    char *command = NULL;
-    long unsigned n = 0;
-    
-    if (getline(&command, &n, stdin) == -1)
-        return NULL;
-    return command;
 }
