@@ -140,7 +140,7 @@ bool isOp(char *s)
 
 /* Check if the string is a pipe */
 bool isPipe(char *s)
-{ return (s[0] == '|'); }
+{ return (strlen(s) == 1 && s[0] == '|'); }
 
 /* Check if the string is a redirection operator */
 bool isRedir(char *s)
