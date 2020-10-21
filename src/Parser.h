@@ -19,8 +19,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <limits.h>
 
 #define BUFF_MAX 1024 /* Maximum number of characters in the character buffer */

@@ -353,6 +353,7 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, char 
                 fprintf(stderr, "parseCmd: could not parse all arguments\n");
                 /* Terminate argv early */
                 argv[*numArgs] = NULL;
+                free(argv);
                 return false;
             }
             argv[*numArgs] = (char*) malloc(BUFF_MAX * sizeof(char));
@@ -398,11 +399,13 @@ bool parseCmd(char *s, const unsigned int maxArgs, char *cmd, char **argv, char 
             if (itr % 2 == 0 && isRedir(token)) /* Expect filenames on even iterations */
             {
                 fprintf(stderr, "parseCmd: expected filename near \'%s\'\n", token);
+                free(argv);
                 return false;
             }
             if (itr % 2 == 1 && !isRedir(token)) /* Expect redirection operator on odd iterations */
             {
                 fprintf(stderr, "parseCmd: expected redirection operator near \'%s\'\n", token);
+                free(argv);
                 return false;
             }
             if (itr % 2 == 0) /* Even iteration */
@@ -726,7 +729,16 @@ int evalCmd(int in, int out, char* s)
                 fd = open(filenames[i], O_RDONLY);
                 if (fd == -1)
                 {
+                    
                     fprintf(stderr, "evalCmd: could not open file \'%s\' for reading\n", filenames[i]);
+                    dup2(fd, 0);
+                    close(fd);
+                        for (unsigned int i = 0; i < numArgs; ++i)
+                            free(argv[i]);
+                        for (unsigned int i = 0; i < numRedirs; ++i)
+                            free(redirs[i]);
+                        for (unsigned int i = 0; i < numFilenames; ++i)
+                            free(filenames[i]);
                     return 1;
                 }
                 dup2(fd, 0);
@@ -734,10 +746,18 @@ int evalCmd(int in, int out, char* s)
             }
             if (strcmp(redirs[i], ">") == 0) /* Output redirection */
             {
-                fd = open(filenames[i], O_WRONLY | O_CREAT);
+                fd = open(filenames[i], O_WRONLY | O_CREAT, 0666);
                 if (fd == -1)
                 {
                     fprintf(stderr, "evalCmd: could not open file \'%s\' for writing\n", filenames[i]);
+                    dup2(fd, 1);
+                    close(fd);
+                    for (unsigned int i = 0; i < numArgs; ++i)
+                        free(argv[i]);
+                    for (unsigned int i = 0; i < numRedirs; ++i)
+                        free(redirs[i]);
+                    for (unsigned int i = 0; i < numFilenames; ++i)
+                        free(filenames[i]);
                     return 1;
                 }
                 dup2(fd, 1);
@@ -745,10 +765,18 @@ int evalCmd(int in, int out, char* s)
             }
             if (strcmp(redirs[i], ">>") == 0) /* Output with append */
             {
-                fd = open(filenames[i], O_WRONLY | O_APPEND | O_CREAT);
+                fd = open(filenames[i], O_WRONLY | O_APPEND | O_CREAT, 0666);
                 if (fd == -1)
                 {
                     fprintf(stderr, "evalCmd: could not open file \'%s\' for writing\n", filenames[i]);
+                    dup2(fd, 1);
+                    close(fd);
+                    for (unsigned int i = 0; i < numArgs; ++i)
+                        free(argv[i]);
+                    for (unsigned int i = 0; i < numRedirs; ++i)
+                        free(redirs[i]);
+                    for (unsigned int i = 0; i < numFilenames; ++i)
+                        free(filenames[i]);
                     return 1;
                 }
                 dup2(fd, 1);

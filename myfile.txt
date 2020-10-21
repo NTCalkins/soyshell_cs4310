@@ -1,0 +1,12 @@
+.
+..
+.git
+.gitignore
+bin
+Makefile
+member_contrib_HarveyLin.txt
+myfile.txt
+README.md
+soyshell
+src
+tests
