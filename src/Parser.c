@@ -733,12 +733,12 @@ int evalCmd(int in, int out, char* s)
                     fprintf(stderr, "evalCmd: could not open file \'%s\' for reading\n", filenames[i]);
                     dup2(fd, 0);
                     close(fd);
-                        for (unsigned int i = 0; i < numArgs; ++i)
-                            free(argv[i]);
-                        for (unsigned int i = 0; i < numRedirs; ++i)
-                            free(redirs[i]);
-                        for (unsigned int i = 0; i < numFilenames; ++i)
-                            free(filenames[i]);
+                    for (unsigned int i = 0; i < numArgs; ++i)
+                        free(argv[i]);
+                    for (unsigned int i = 0; i < numRedirs; ++i)
+                        free(redirs[i]);
+                    for (unsigned int i = 0; i < numFilenames; ++i)
+                        free(filenames[i]);
                     return 1;
                 }
                 dup2(fd, 0);
