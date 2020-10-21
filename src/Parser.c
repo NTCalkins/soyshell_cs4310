@@ -126,13 +126,10 @@ bool isOp(char *s)
     }
     else /* Compare the string to supported 2 character operators */
     {
-        const unsigned int NUM_OPS = 2;
-        char *ops[NUM_OPS] = { "&&", "||" }; /* All supported 2 character operators */
-        for (unsigned int i = 0; i < NUM_OPS; ++i)
-        {
-            if (strcmp(s, ops[i]) == 0)
-                return true;
-        }
+        if (strcmp(s, "&&") == 0)
+            return true;
+        if (strcmp(s, "||") == 0)
+            return true;
         return false;
     }
 }
@@ -544,7 +541,7 @@ int evalInvoke(char *s)
     int in = 0;
     int fd[2];
     bool ok;
-    int r;
+    int r = 0;
     if (strlen(s) == 0) /* Empty string passed */
         return 0;
     ok = parseInvoke(s, cmds, &numCmds, &numPipes);
@@ -779,7 +776,9 @@ int evalCmd(int in, int out, char* s)
     if (isBg) /* Don't wait for background process */
         return 0;
     r = waitpid(pid, 0, 0);
-    return r;
+    if (r == -1)
+        return 1;
+    return 0;
 }
 
 /* Evaluate the statement */
