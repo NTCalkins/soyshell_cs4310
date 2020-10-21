@@ -706,6 +706,8 @@ int evalCmd(int in, int out, char* s)
             free(filenames[i]);
         return retVal;
     }
+    if (strcmp(cmd, "exit") == 0) /* Special case for exit */
+        exit(0); /* Just quit */
     ok = getExecPath(cmd, exec);
     if (!ok) /* Failed to get valid path to executable */
     {

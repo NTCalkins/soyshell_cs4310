@@ -35,10 +35,7 @@ int main() {
         }
         len = strlen(expr);
         if (expr[len-1] == '\n')
-            expr[len-1] = 0;
-        if (strncmp(expr, "exit", 4) == 0) {
-            break;
-        }
+            expr[len-1] = 0;        
         if (len == 0) /* Empty expression */
             continue;
         lastResult = evalExpr(expr);
