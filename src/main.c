@@ -2,13 +2,14 @@
 
 int main() {
    init();
-    char d[PATH_MAX];
-    char user[BUFF_MAX];
-    int nread;
+    char d[PATH_MAX] = "";
+    char user[BUFF_MAX] = "";
+    int nread = 0;
     size_t n = 0;
+    int len = 0;
 
     unsigned int i = 0;
-    int lastResult;
+    int lastResult = 0;
 
     if (getcwd(d, sizeof(d)) == NULL) {
         return 0;
@@ -32,11 +33,11 @@ int main() {
             printf("%s\n","Failed to read stdin");
             continue;
         }
-        int len = strlen(expr);
+        len = strlen(expr);
         if (expr[len-1] == '\n')
             expr[len-1] = 0;
         if (strncmp(expr, "exit", 4) == 0) {
-            return 0;
+            break;
         }
         if (len == 0) /* Empty expression */
             continue;

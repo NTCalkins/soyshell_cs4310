@@ -28,10 +28,6 @@
 #define INIT_CONSTS 8 /* Initial number of constants to allocate memory for */
 #define MAX_ARGS 1024 /* Maximum number of arguments in argv */
 
-char ***consts; /* Array of string pairs to store user defined constants. If we have more time, this should be replaced with a BST */
-unsigned int numConsts; /* Current number of constants ie. next free index */
-unsigned int maxConsts; /* Current maximum number of user defined constants */
-
 void init();
 void finish();
 bool addConst(char*, char*);

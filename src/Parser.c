@@ -14,6 +14,10 @@
 */
 #include "Parser.h"
 
+char ***consts; /* Array of string pairs to store user defined constants. If we have more time, this should be replaced with a BST */
+unsigned int numConsts; /* Current number of constants ie. next free index */
+unsigned int maxConsts; /* Current maximum number of user defined constants */
+
 /* Initialize the global variables */
 void init()
 {
@@ -535,8 +539,8 @@ int evalInvoke(char *s)
 {
     /* For parseInvoke */
     char *cmds[MAX_ARGS]; /* Array to store the commands parsed */
-    unsigned int numCmds; /* Number of commands extracted */
-    unsigned int numPipes; /* Number of pipes extracted */
+    unsigned int numCmds = 0; /* Number of commands extracted */
+    unsigned int numPipes = 0; /* Number of pipes extracted */
     /* File descriptors to handle forking */
     int in = 0;
     int fd[2];
