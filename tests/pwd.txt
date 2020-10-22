@@ -1,0 +1,4 @@
+Test cases for "pwd":
+
+1. Successfully display the present working directory
+2. Inputting with multiple arguments
