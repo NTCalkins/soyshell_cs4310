@@ -1,0 +1,10 @@
+Test cases for "ls":
+
+1. Successfully lists contents of current pwd.
+2. Successfully lists contents within a specific directory.
+3. Successfully lists contents within a specific directory with ".." within the arugment.
+4. Successfully lists contents within a specific directory within another directory.
+5. Using a directory that does not exist as an argument.
+6. Using a directory that does not exist as an argument with ".." within the arugment.
+7. Using a directory within another directory that does not exist as an argument.
+8. Inputting too many arguments.
