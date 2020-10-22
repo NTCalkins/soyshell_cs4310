@@ -31,7 +31,7 @@ void init()
     strcpy(consts[numConsts][0], "PATH");
     /* For the purpose of the assignment, we will make the assumption that the executable is called in the root of the
        repo and the default path will be the repo's bin folder */
-    getcwd(consts[numConsts][1], BUFF_MAX);
+    consts[numConsts][1] = getcwd(consts[numConsts][1], BUFF_MAX);
     strcat(consts[numConsts][1], "/bin");
     ++numConsts;
 }
@@ -561,7 +561,15 @@ int evalInvoke(char *s)
     {
         for (unsigned int i = 0; i < numCmds - 1; ++i)
         {
-            pipe(fd);
+            r = pipe(fd);
+            if (r == -1) /* Failed to pipe */
+            {
+                fprintf(stderr, "evalInvoke: failed to create pipe\n");
+                /* Free cmds */
+                for (unsigned int i = 0; i < numCmds; ++i)
+                    free(cmds[i]);
+                return 1;
+            }
             evalCmd(in, fd[1], cmds[i]);
             close(fd[1]); /* No longer need write end of pipe */
             in = fd[0]; /* Keep read end of pipe */
