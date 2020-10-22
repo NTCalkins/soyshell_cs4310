@@ -1,0 +1,40 @@
+Test cases for "cd":
+
+1. Successfully changing directory.
+2. Using ".." to move out of current directory and into the previous directory.
+3. Not finding directory to change to.
+4. Not having enough arguments.
+5. Successfully changing to a directory with one or more whitespaces within it.
+6. Having too many arguments.
+7. Changing through more than one directory.
+
+greatever@greatever-VirtualBox:~/CS 4310/soyshell_cs4310$ ./soyshell
+Welcome to soyshell!
+anonymous@soyshell soyshell_cs4310 > pwd
+/home/greatever/CS 4310/soyshell_cs4310
+anonymous@soyshell soyshell_cs4310 > cd src
+anonymous@soyshell src > pwd
+/home/greatever/CS 4310/soyshell_cs4310/src
+anonymous@soyshell src > cd ..
+anonymous@soyshell soyshell_cs4310 > pwd
+/home/greatever/CS 4310/soyshell_cs4310
+anonymous@soyshell soyshell_cs4310 > cd fakeDirectory
+cd: failed to change directory
+anonymous@soyshell soyshell_cs4310 > cd
+cd: invalid number of arguments
+anonymous@soyshell soyshell_cs4310 > pwd
+/home/greatever/CS 4310/soyshell_cs4310
+anonymous@soyshell soyshell_cs4310 > cd ..
+anonymous@soyshell CS 4310 > pwd
+/home/greatever/CS 4310
+anonymous@soyshell CS 4310 > cd ..
+anonymous@soyshell greatever > cd "CS 4310"
+anonymous@soyshell CS 4310 > pwd
+/home/greatever/CS 4310
+anonymous@soyshell CS 4310 > cd soyshell_cs4310 src
+cd: invalid number of arguments
+anonymous@soyshell CS 4310 > cd soyshell_cs4310/src
+anonymous@soyshell src > pwd
+/home/greatever/CS 4310/soyshell_cs4310/src
+anonymous@soyshell src > exit
+greatever@greatever-VirtualBox:~/CS 4310/soyshell_cs4310$ 
