@@ -1,0 +1,5 @@
+Test cases for "mkdir":
+
+1. Successfully creating a new directory.
+2. Successfully creating a new directory with one or more spaces in the directory's name.
+3. Failing to create a new directory due to another directory having the same name. (Fails atm)
