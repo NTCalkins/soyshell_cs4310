@@ -1,0 +1,3 @@
+Test cases for "exit":
+
+1. Exits the shell normally.
