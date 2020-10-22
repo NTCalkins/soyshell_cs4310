@@ -32,6 +32,8 @@ void init()
     /* For the purpose of the assignment, we will make the assumption that the executable is called in the root of the
        repo and the default path will be the repo's bin folder */
     consts[numConsts][1] = getcwd(consts[numConsts][1], BUFF_MAX);
+    if (consts[numConsts][1] == NULL)
+        fprintf(stderr, "warning: failed to initialize PATH\n");
     strcat(consts[numConsts][1], "/bin");
     ++numConsts;
 }
