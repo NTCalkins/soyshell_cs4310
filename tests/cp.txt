@@ -4,4 +4,4 @@ Test cases for "cp":
 2. Using whitespace in the argument(s).
 3. Using ".." within an argument.
 4. Inputting too few arguments.
-4. Inputting too many arguments. (Other arguments ignored)
+5. Inputting too many arguments. (Other arguments ignored)
