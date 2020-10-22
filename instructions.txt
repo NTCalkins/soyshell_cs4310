@@ -1,0 +1,3 @@
+1. Build the shell by running "make" in the same directory as the Makefile. The resulting executable will be named "soyshell" and will be placed in the same directory.
+2. Ensure you are at the root of the directory (i.e. the same directory as the Makefile) so that soyshell will correctly locate the executable files for the commands written for the assignment. If soyshell for some reason does not use the correct path, specify the path manually by running an assignment statement in soyshell (e.g. PATH = $PATH:/usr/bin). **Note the need for spaces between the = in the assignment statement!
+3. Run the shell with "./soyshell"
