@@ -6,7 +6,7 @@ int main (int argc, char **argv)
 {
     if (argc != 2) {
         puts("No directory given");
-        return 0;
+        return 1;
     }
     int r = rmdir(argv[1]);
     if (r == -1) {

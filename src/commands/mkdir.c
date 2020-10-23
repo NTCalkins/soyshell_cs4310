@@ -12,9 +12,11 @@ int main(int argc, char **argv)
     }
     status = mkdir(argv[1],0700);
     if (status == -1)
+    {
         if (errno == EEXIST) {
             puts("Error: directory already exists");
         }
-        return -1;
+        return 1;
+    }
     return 0;
 }
