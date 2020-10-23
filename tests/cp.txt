@@ -1,0 +1,7 @@
+Test cases for "cp":
+
+1. Successfully copying content from a file to another file.
+2. Using whitespace in the argument(s).
+3. Using ".." within an argument.
+4. Inputting too few arguments.
+5. Inputting too many arguments. (Other arguments ignored)
