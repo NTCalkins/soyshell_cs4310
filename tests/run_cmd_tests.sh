@@ -48,8 +48,8 @@ $BIN/./soyshell >> tests/log.txt
 [[ $? == 0 ]] && [ -d tests/temp/test_dir ] && echo "PASSED" || echo "FAILED"
 echo "Testing exit..."
 $BIN/exit >> tests/log.txt
-$BIN/cd tests >> log.txt
 [[ $? == 0 ]] && [ -d tests/temp/dir_1 ] && [ -d tests/temp/dir_2 ] && echo "PASSED" || echo "FAILED"
+$BIN/cd tests >> log.txt
 
 # Test rmdir
 echo "Testing rmdir..."
