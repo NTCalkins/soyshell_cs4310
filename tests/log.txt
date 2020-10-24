@@ -1,0 +1,6 @@
+Files temp/foo.txt and temp/bar.txt are identical
+Not enough arguments
+directory cannot be read.
+directory cannot be read.
+directory cannot be read.
+temp/dir_1 could not be removed: either not empty or nonexistent

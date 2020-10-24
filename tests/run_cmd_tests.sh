@@ -34,7 +34,7 @@ $BIN/mkdir temp/dir1 temp/dir2 >> log.txt
 
 # Test cd
 echo "Testing cd..."
-$BIN/cd temp/test_dir >> ../../log.txt
+$BIN/cd temp/test_dir >> log.txt
 [[ $? == 0 ]] && ! [ -d temp/test_dir ] && echo "PASSED" || echo "FAILED"
 $BIN/cd ../.. >> log.txt
 [[ $? == 0 ]] && [ -d temp/dir_1 ] && [ -d temp/dir_2 ] && echo "PASSED" || echo "FAILED"
@@ -48,6 +48,7 @@ $BIN/./soyshell >> tests/log.txt
 [[ $? == 0 ]] && [ -d tests/temp/test_dir ] && echo "PASSED" || echo "FAILED"
 echo "Testing exit..."
 $BIN/exit >> tests/log.txt
+$BIN/cd tests >> log.txt
 [[ $? == 0 ]] && [ -d tests/temp/dir_1 ] && [ -d tests/temp/dir_2 ] && echo "PASSED" || echo "FAILED"
 
 # Test rmdir
