@@ -1,0 +1,4 @@
+- Implemented cd.c in the src/commands directory.
+- Wrote the test cases for the minimum required commands.
+- Tested the minimum required commands and reported any errors found.
+- Contributed to the "New Features" portion of the report.

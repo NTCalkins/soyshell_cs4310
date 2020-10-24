@@ -42,6 +42,9 @@ $BIN/rm temp/dir_1 temp/dir_2 >> log.txt
 # Test pwd
 echo "Testing pwd..."
 [[ $($BIN/pwd) == $PWD ]] && echo "PASSED" || echo "FAILED"
+[[ $($BIN/pwd three extra arguments) == $PWD ]] && echo "PASSED" || echo "FAILED"
+
+# Will test cd after I eat
 
 # Clean up
 rm -r temp
