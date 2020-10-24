@@ -32,19 +32,26 @@ $BIN/mkdir temp/test_dir >> log.txt
 $BIN/mkdir temp/dir1 temp/dir2 >> log.txt
 [[ $? == 0 ]] && [ -d temp/dir_1 ] && [ -d temp/dir_2 ] && echo "PASSED" || echo "FAILED"
 
-# Test rm
-echo "Testing rm..."
-$BIN/rm temp/test_dir >> log.txt
+# Test cd
+echo "Testing cd..."
+$BIN/cd temp/test_dir >> log.txt
 [[ $? == 0 ]] && ! [ -d temp/test_dir ] && echo "PASSED" || echo "FAILED"
-$BIN/rm temp/dir_1 temp/dir_2 >> log.txt
+$BIN/cd ../.. >> log.txt
+[[ $? == 0 ]] && [ -d temp/dir_1 ] && [ -d temp/dir_2 ] && echo "PASSED" || echo "FAILED"
+$BIN/cd temp/dir_1 temp/dir_2 >> log.txt
+[[ $? == 0 ]] && [ -d temp/dir_1 ] && [ -d temp/dir_2 ] && echo "PASSED" || echo "FAILED"
+
+# Test rmdir
+echo "Testing rmdir..."
+$BIN/rmdir temp/test_dir >> log.txt
+[[ $? == 0 ]] && ! [ -d temp/test_dir ] && echo "PASSED" || echo "FAILED"
+$BIN/rmdir temp/dir_1 temp/dir_2 >> log.txt
 [[ $? == 0 ]] && ! [ -d temp/dir_1 ] && ! [ -d temp/dir_2 ] && echo "PASSED" || echo "FAILED"
 
 # Test pwd
 echo "Testing pwd..."
 [[ $($BIN/pwd) == $PWD ]] && echo "PASSED" || echo "FAILED"
 [[ $($BIN/pwd three extra arguments) == $PWD ]] && echo "PASSED" || echo "FAILED"
-
-# Will test cd after I eat
 
 # Clean up
 rm -r temp
