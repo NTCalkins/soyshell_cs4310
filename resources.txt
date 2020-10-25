@@ -1,0 +1,16 @@
+https://www.geeksforgeeks.org/difference-fork-exec/
+
+https://www.gnu.org/software/libc/manual/html_node/Foreground-and-Background.html
+
+https://linux.die.net/man/2/chdir
+
+https://linux.die.net/man/2/rmdir
+
+https://linux.die.net/man/1/pwd
+
+https://linux.die.net/man/3/cwd
+
+https://linux.die.net/man/1/pmpath
+
+https://tldp.org/LDP/lpg/node11.html
+
