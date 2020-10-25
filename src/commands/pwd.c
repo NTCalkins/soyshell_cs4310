@@ -8,7 +8,7 @@ int main(int argc, char **argv)
 	char *cwd = NULL;
         if (argc != 1 ) {
                 puts("pwd: too many arguments");
-                return -1;
+                return 1;
         }
         cwd = getcwd(cwd, PATH_MAX);
         puts(cwd);
