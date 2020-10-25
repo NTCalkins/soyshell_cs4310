@@ -16,7 +16,6 @@ temp2
 directory cannot be read.
 Error: directory temp/test_dir already exists
 No arguments given
-temp/dir_1 could not be removed: either not empty or nonexistent
 fake_dir could not be removed: either not empty or nonexistent
 No directory/directories given
 ../fake_dir2 could not be removed: either not empty or nonexistent

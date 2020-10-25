@@ -2,8 +2,8 @@ Test cases for "rmdir":
 
 [ P ] 1. Successfully remove a directory.
 [ P ] 2. Removing a directory within another directory.
-[ F ] 3. Inputting too many arguments. (Fails atm: Prompts the user: "No directory given", still does that)
+[ P ] 3. Inputting too many arguments.
 [ P ] 4. Unsuccessfully remove a directory due to the directory not existing.
 [ P ] 5. Inputting too few arguments.
-[ P ] 6. Removing a directory within another directory with one or more spaces. (Fails atm: Prompts user "No arguments given")
+[ P ] 6. Removing a directory within another directory with one or more spaces.
 [ P ] 8. Using ".." within an argument.

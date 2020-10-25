@@ -1,4 +1,4 @@
 Test cases for "pwd":
 
 [ P ] 1. Successfully display the present working directory
-[ F ] 2. Inputting with more than one argument (Fails the tests. Returns -1, but still fails (should it return 1 as a fail?). I tried it manually and it works.)
+[ P ] 2. Inputting with more than one argument

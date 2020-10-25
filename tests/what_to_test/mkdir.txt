@@ -2,8 +2,7 @@ Test cases for "mkdir":
 
 [ P ] 1. Successfully creating a new directory.
 [ P ] 2. Creating a directory within another directory.
-[ F ] 3. Failing to create a new directory due to another directory having the same name and prompt user. (Fails, because it still returns 0)
-[ F ] 4. Inputting too many arguments. (Fails in the script. Its kind of weird when I manually tested it) (Also, "too many arguments" could be changed to "more than 1 argument" to create multiple directories)
+[ P ] 3. Failing to create a new directory due to another directory having the same name and prompt user.
+[ P ] 4. Inputting too many arguments.
 [ P ] 5. Successfully creating a new directory with one or more spaces in the directory's name.
 [ P ] 6. Inputting too few arguments.
-7. Using ".." within an argument.

@@ -1,10 +1,9 @@
 Test cases for "ls":
 
-[ F ] 1. Successfully lists contents of current pwd. (This fails for me for some reason)
+[ P ] 1. Successfully lists contents of current pwd.
 [ P ] 2. Using a directory that does not exist as an argument.
 [ P ] 3. Using a directory that does not exist as an argument with ".." within the arugment.
 [ P ] 4. Inputting too many arguments.
 [ P ] 5. Successfully lists contents within a specific directory.
 [ P ] 6. Successfully lists contents within a specific directory within another directory.
 [ P ] 7. Using a directory within another directory that does not exist as an argument.
-8. Successfully lists contents within a specific directory with ".." within the arugment.
