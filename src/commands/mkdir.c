@@ -5,6 +5,7 @@
 int main(int argc, char **argv)
 {
     int status;
+    int r = 0;
     if (argc < 2)
     {
 	    puts("No arguments given");
@@ -17,7 +18,8 @@ int main(int argc, char **argv)
             if (errno == EEXIST) {
                 printf("Error: directory %s already exists\n",argv[i]);
             }
+            r = 1;
         }
     }
-    return 0;
+    return r;
 }
