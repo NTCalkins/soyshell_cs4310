@@ -1,0 +1,5 @@
+Implemented ls, cp, mkdir, rmdir, pwd in src/commands
+Contributed to the implementation of the parser
+Contributed to introduction, design, new features, techniques used, findings, conclusions section of report
+Searched for memory leaks in program using valgrind
+Fixed small bugs (mostly related to memory leaks)
