@@ -2,3 +2,4 @@
 - Implemented the parser in Parser.h and Parser.c
 - Wrote the Makefile
 - Contributed to the "Design" section of the report
+- Set up the bash script used for unit testing commands
