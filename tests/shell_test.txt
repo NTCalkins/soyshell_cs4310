@@ -1,0 +1,10 @@
+PATH = ../bin
+EDITOR = emacs
+mkdir temp
+mkdir temp/$EDITOR
+mkdir temp/and_test1 && mkdir temp/and_test2 && cd non_exist_dir && mkdir temp/and_test3
+mkdir temp/or_test1 || mkdir temp/or_test2
+cd non_exist_dir || mkdir temp/or_test3
+mkdir temp/brace_test1 && { mkdir temp/brace_test2 || mkdir temp/brace_test3 } && mkdir temp/brace_test4
+mkdir "temp/dir with space"
+exit
